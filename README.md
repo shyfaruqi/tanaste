@@ -1,7 +1,6 @@
 <div align="center">
 
-# 🎬 Tanaste
-### The Unified Media Intelligence Kernel
+<img src="assets/images/tanaste-hero.svg" alt="Tanaste — The Unified Media Intelligence Kernel" width="720" />
 
 **A cross-media Hub for your digital life.**
 

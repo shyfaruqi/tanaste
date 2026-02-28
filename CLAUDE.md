@@ -203,6 +203,20 @@ A high-contrast, large-button display mode designed for use at a distance (e.g. 
 **Real-time updates (Intercom)**
 The Dashboard is connected to the Engine via a persistent live channel (the "Intercom"). When a new file is ingested or processing progresses, the Dashboard updates instantly — no manual refresh, no polling. The progress bar is live.
 
+### 3.5 — Brand Assets
+
+Three official SVG logo files exist. **Never replace logo placements with hand-written text.** Always use the correct file for the context.
+
+| File | Location in repo | Use when… |
+|---|---|---|
+| `tanaste-logo.svg` | `src/Tanaste.Web/wwwroot/images/` and `assets/images/` | Full horizontal logo — mark + "TANASTE" wordmark. Use in the Dashboard AppBar and anywhere a full branded header is needed. |
+| `tanaste-icon.svg` | `src/Tanaste.Web/wwwroot/images/`, `wwwroot/favicon.svg`, and `assets/images/` | Square icon mark only. Use as favicon, drawer icon, app icon, or any small/square slot. |
+| `tanaste-hero.svg` | `assets/images/` | Mark + wordmark + subtitle ("The Unified Media Intelligence Kernel"). Use in README hero and marketing contexts only. |
+
+**Color note:** All three SVGs use hardcoded fills: white (`#fff`) for highlight layers and black (default) for the main strokes. They are designed primarily for dark backgrounds (as used in the Dashboard). On light backgrounds, the mark renders as a black design — which is clean and intentional.
+
+**Source files** are in `C:\Users\shaya\OneDrive\Documents\Projects\Tanaste\Graphics\` (outside the repo — designer originals). Do not modify the SVGs in the repo directly; request updated exports from the source files.
+
 ---
 
 ## 4. Product Owner Communication Rules
