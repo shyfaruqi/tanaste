@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/images/tanaste-icon.svg" alt="Tanaste — The Unified Media Intelligence Kernel" height="80" /> <img src="assets/images/tanaste-logo.svg" alt="Tanaste — The Unified Media Intelligence Kernel" height="70" />
+<img src="assets/images/tanaste-logo.svg" alt="Tanaste — The Unified Media Intelligence Kernel" height="90" />
 
 **A cross-media Hub for your digital life.**
 
