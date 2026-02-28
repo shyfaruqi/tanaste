@@ -1,0 +1,30 @@
+@namespace Tanaste.Web.Shared
+
+<MudNavMenu>
+    <MudText Typo="Typo.overline" Class="px-4 mt-4 mb-2 mud-text-disabled">Navigation</MudText>
+
+    <MudNavLink Href="/"
+                Icon="@Icons.Material.Filled.LibraryBooks"
+                Match="NavLinkMatch.All">
+        Library
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudText Typo="Typo.overline" Class="px-4 mt-4 mb-2 mud-text-disabled">Tools</MudText>
+
+    <MudNavLink Href="/ingestion"
+                Icon="@Icons.Material.Filled.FolderOpen">
+        Ingestion
+    </MudNavLink>
+
+    <MudNavLink Href="/metadata"
+                Icon="@Icons.Material.Filled.Tune">
+        Metadata
+    </MudNavLink>
+
+    <MudNavLink Href="/admin"
+                Icon="@Icons.Material.Filled.AdminPanelSettings">
+        Admin
+    </MudNavLink>
+</MudNavMenu>

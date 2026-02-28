@@ -5,19 +5,21 @@
   </PropertyGroup>
 
   <ItemGroup Label="Production">
-    <PackageVersion Include="Microsoft.Data.Sqlite"                   Version="10.0.3" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting"            Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Data.Sqlite"                     Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting"              Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
     <!-- Swashbuckle 7.x: kept at 7.x intentionally — upgrading to 10.x requires
          switching Program.cs to the new .NET 9+ OpenAPI infrastructure. -->
-    <PackageVersion Include="Swashbuckle.AspNetCore"                  Version="7.3.1"  />
-    <PackageVersion Include="VersOne.Epub"                            Version="3.1.0"  />
+    <PackageVersion Include="Swashbuckle.AspNetCore"                    Version="7.3.1"  />
+    <PackageVersion Include="VersOne.Epub"                              Version="3.1.0"  />
+    <!-- UI -->
+    <PackageVersion Include="MudBlazor"                                 Version="9.0.0"  />
   </ItemGroup>
 
   <ItemGroup Label="Test">
-    <PackageVersion Include="coverlet.collector"              Version="6.0.4"  />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk"          Version="17.14.1" />
-    <PackageVersion Include="xunit"                           Version="2.9.3"  />
-    <PackageVersion Include="xunit.runner.visualstudio"       Version="3.1.4"  />
+    <PackageVersion Include="coverlet.collector"           Version="6.0.4"   />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk"       Version="17.14.1" />
+    <PackageVersion Include="xunit"                        Version="2.9.3"   />
+    <PackageVersion Include="xunit.runner.visualstudio"    Version="3.1.4"   />
   </ItemGroup>
 </Project>

@@ -6,6 +6,7 @@
     <Project Path="src/Tanaste.Intelligence/Tanaste.Intelligence.csproj" />
     <Project Path="src/Tanaste.Processors/Tanaste.Processors.csproj" />
     <Project Path="src/Tanaste.Storage/Tanaste.Storage.csproj" />
+    <Project Path="src/Tanaste.Web/Tanaste.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Tanaste.Domain.Tests/Tanaste.Domain.Tests.csproj" />

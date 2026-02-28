@@ -1,0 +1,55 @@
+@namespace Tanaste.Web.Components.Universe
+
+@* "Last Journey" smart tile (Section 2.2 of the UI ASD).
+   Displays the most-recently active hub as a hero card with glassmorphic styling. *@
+
+@if (Hub is not null)
+{
+    <MudCard Class="hub-hero mud-elevation-4 mb-4" Style="position: relative; overflow: hidden;">
+        <div class="hero-glass-overlay" />
+
+        <MudCardContent Class="pa-6" Style="position: relative; z-index: 1;">
+            <MudChip T="string" Color="Color.Primary" Size="Size.Small" Class="mb-3">
+                Last Journey
+            </MudChip>
+
+            <MudText Typo="Typo.h4" Class="mb-1">@Hub.DisplayName</MudText>
+
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                @Hub.MediaTypes — @Hub.WorkCount @(Hub.WorkCount == 1 ? "work" : "works")
+            </MudText>
+
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PlayArrow">
+                    Resume
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.Info">
+                    Details
+                </MudButton>
+            </MudStack>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    [Parameter] public HubViewModel? Hub   { get; set; }
+}
+
+<style>
+    .hub-hero {
+        background: linear-gradient(135deg, rgba(124, 77, 255, 0.20) 0%, rgba(0, 191, 165, 0.10) 100%);
+        border: 1px solid rgba(124, 77, 255, 0.30);
+        min-height: 200px;
+    }
+
+    .hero-glass-overlay {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at top left, rgba(124,77,255,0.15), transparent 70%);
+        pointer-events: none;
+    }
+</style>

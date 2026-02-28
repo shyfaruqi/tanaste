@@ -1,0 +1,69 @@
+@namespace Tanaste.Web.Shared
+@inherits LayoutComponentBase
+@inject ThemeService ThemeService
+@implements IDisposable
+
+<MudThemeProvider Theme="@ThemeService.Theme" IsDarkMode="@_isDark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="2">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="@ToggleDrawer"
+                       title="Toggle navigation" />
+
+        <MudText Typo="Typo.h6" Class="ml-3 mud-text-secondary">Tanaste</MudText>
+
+        <MudSpacer />
+
+        <MudIconButton Icon="@(_isDark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       Color="Color.Inherit"
+                       OnClick="@ToggleTheme"
+                       title="@(_isDark ? "Switch to Light Mode" : "Switch to Dark Mode")" />
+    </MudAppBar>
+
+    <MudDrawer Open="_drawerOpen"
+               OpenChanged="@((v) => _drawerOpen = v)"
+               Elevation="1"
+               ClipMode="DrawerClipMode.Always"
+               Variant="DrawerVariant.Persistent">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="pt-16 pa-4">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _isDark     = true;
+    private bool _drawerOpen = true;
+
+    protected override void OnInitialized()
+    {
+        _isDark = ThemeService.IsDarkMode;
+        ThemeService.OnThemeChanged += OnThemeUpdated;
+    }
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private void ToggleTheme()
+    {
+        ThemeService.ToggleTheme();
+        _isDark = ThemeService.IsDarkMode;
+    }
+
+    private void OnThemeUpdated()
+    {
+        _isDark = ThemeService.IsDarkMode;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => ThemeService.OnThemeChanged -= OnThemeUpdated;
+}

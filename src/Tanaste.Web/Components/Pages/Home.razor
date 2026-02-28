@@ -1,0 +1,44 @@
+@page "/"
+@inject UIOrchestratorService Orchestrator
+
+<PageTitle>Tanaste — Library</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-6">Library</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+else
+{
+    <HubHero Hub="@_heroHub" />
+    <UniverseStack Hubs="@_hubs" Class="mt-6" />
+}
+
+@code {
+    private bool                _loading = true;
+    private string?             _error;
+    private HubViewModel?       _heroHub;
+    private List<HubViewModel>  _hubs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _hubs    = await Orchestrator.GetHubsAsync();
+            _heroHub = _hubs.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Could not reach Tanaste API: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
