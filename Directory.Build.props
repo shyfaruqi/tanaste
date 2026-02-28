@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    Shared build properties inherited by every project in this repository.
+    Project-specific properties (RootNamespace, AssemblyName, Sdk type) stay in
+    their individual .csproj files.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <LangVersion>latest</LangVersion>
+    <!-- Treat nullable warnings as errors to catch nullability regressions at compile time. -->
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>

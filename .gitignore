@@ -54,5 +54,6 @@ desktop.ini
 *.sqlite
 *.sqlite3
 
-# Local manifest overrides (keep tanaste_master.json but not rotated backup)
+# Live manifest — copy tanaste_master.example.json and edit locally
+tanaste_master.json
 tanaste_master.json.bak

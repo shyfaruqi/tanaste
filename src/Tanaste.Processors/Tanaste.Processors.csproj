@@ -1,19 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Deterministic>true</Deterministic>
-  </PropertyGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Tanaste.Domain\Tanaste.Domain.csproj" />
   </ItemGroup>
 
   <!-- VersOne.Epub: EPUB 2/3 parser; no native/P-Invoke; pure managed. -->
   <ItemGroup>
-    <PackageReference Include="VersOne.Epub" Version="3.1.0" />
+    <PackageReference Include="VersOne.Epub" />
   </ItemGroup>
 
 </Project>

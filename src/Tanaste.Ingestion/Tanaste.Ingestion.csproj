@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Tanaste.Ingestion</RootNamespace>
     <AssemblyName>Tanaste.Ingestion</AssemblyName>
   </PropertyGroup>
@@ -12,7 +9,7 @@
     <!--
       Domain types (MediaAsset, AssetStatus) and intelligence/processor services
       are all required by the full ingestion pipeline.
-      System.Threading.Channels is part of the net9.0 BCL — no NuGet needed.
+      System.Threading.Channels is part of the net10.0 BCL — no NuGet needed.
     -->
     <ProjectReference Include="..\Tanaste.Domain\Tanaste.Domain.csproj" />
     <ProjectReference Include="..\Tanaste.Intelligence\Tanaste.Intelligence.csproj" />
@@ -20,8 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
 </Project>

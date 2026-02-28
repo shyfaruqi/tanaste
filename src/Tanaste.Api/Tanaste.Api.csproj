@@ -1,16 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Tanaste.Api</RootNamespace>
     <AssemblyName>Tanaste.Api</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Swagger / OpenAPI UI — 7.x branch for full .NET 10 compatibility -->
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
+    <!-- Swashbuckle 7.x: intentionally pinned — see Directory.Packages.props for rationale. -->
+    <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>
