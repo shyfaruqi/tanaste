@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 using Tanaste.Web.Models.ViewDTOs;
 
 namespace Tanaste.Web.Services.Integration;
@@ -192,6 +192,27 @@ public sealed class UIOrchestratorService : IAsyncDisposable
                 "Intercom ← IngestionProgress: [{Stage}] {Done}/{Total} — {File}",
                 ev.Stage, ev.ProcessedCount, ev.TotalCount, ev.CurrentFile);
             _state.PushIngestionProgress(ev);
+        });
+
+        // ── "MetadataHarvested" ───────────────────────────────────────────────
+        // An external provider updated cover art / description / narrator etc.
+        // Invalidate the state cache so cards re-render with the new data.
+        _hubConnection.On<MetadataHarvestedEvent>("MetadataHarvested", ev =>
+        {
+            _logger.LogDebug(
+                "Intercom ← MetadataHarvested: EntityId={Id} Provider={Provider} Fields=[{Fields}]",
+                ev.EntityId, ev.ProviderName, string.Join(",", ev.UpdatedFields));
+            _state.Invalidate();
+        });
+
+        // ── "PersonEnriched" ──────────────────────────────────────────────────
+        // Wikidata has enriched an author/narrator with a headshot + biography.
+        _hubConnection.On<PersonEnrichedEvent>("PersonEnriched", ev =>
+        {
+            _logger.LogDebug(
+                "Intercom ← PersonEnriched: PersonId={Id} Name={Name}",
+                ev.PersonId, ev.Name);
+            _state.PushPersonEnriched(ev);
         });
 
         // ── Connection lifecycle logging ──────────────────────────────────────

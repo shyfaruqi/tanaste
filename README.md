@@ -190,6 +190,36 @@ Tanaste.Domain          ← Business rules and data shapes (zero dependencies)
 
 ---
 
+## 🌐 Supported Metadata Providers
+
+Tanaste ships with three built-in zero-key providers — no API accounts, no rate-limit quotas, no cost. They activate automatically after you enable them in `tanaste_master.json`.
+
+| Provider | Media type | What it contributes | Throttle |
+|---|---|---|---|
+| **Apple Books** (ebook) | EPUB / ebooks | Cover art (600 × 600), description, rating, title | 1 req / 300 ms |
+| **Apple Books** (audiobook) | Audiobooks | Cover art (600 × 600), description, rating, title | shared |
+| **Audnexus** | Audiobooks | Narrator, series, series position, cover art, author | none |
+| **Wikidata** | All (people) | Person headshot (Wikimedia Commons), biography, Q-identifier | 1 req / 1.1 s |
+
+All network calls run on a **background channel** (`Channel<HarvestRequest>`, bounded 500 items, DropOldest). File ingestion never blocks waiting for network.
+
+**Recursive Person Enrichment** — each author and narrator found in a file's embedded tags gets a `Person` record linked to the asset. Unenriched persons are automatically queued for a Wikidata lookup. When the headshot and biography arrive, a `PersonEnriched` SignalR event pops the data into the Dashboard card in real time.
+
+**To enable providers**, set `"enabled": true` for each entry in the `providers` array of `tanaste_master.json`, and add your local URL overrides to the `provider_endpoints` section if needed:
+
+```json
+"provider_endpoints": {
+    "apple_books":     "https://itunes.apple.com",
+    "audnexus":        "https://api.audnexus.com",
+    "wikidata_api":    "https://www.wikidata.org/w/api.php",
+    "wikidata_sparql": "https://query.wikidata.org/sparql"
+}
+```
+
+All URLs live in `tanaste_master.json` — changing a provider's base address requires only a config edit, never a recompile.
+
+---
+
 ## 🔌 Arr Compatibility (Radarr / Sonarr)
 
 Tanaste's Engine exposes a standard HTTP API secured by an **`X-Api-Key` header** — the same authentication pattern used by Radarr, Sonarr, Lidarr, and the broader \*Arr ecosystem.
@@ -218,6 +248,8 @@ External apps can query Hubs, trigger library scans, and resolve metadata confli
 | **Phase 5** | Media processors — EPUB, Video (stub), Comic (CBZ/CBR), Generic fallback |
 | **Phase 6** | Intelligence Engine — Weighted Voter, Conflict Resolver, Identity Matcher, Hub Arbiter |
 | **Phase 7** | Ingestion Engine — Watch Folder, debounce queue, content hasher, background worker |
+| **Phase 8** | Field-Level Arbitration — User-Locked Claims, per-field provider trust matrix |
+| **Phase 9** | External Metadata Adapters — Apple Books, Audnexus, Wikidata; Recursive Person Enrichment |
 | **UI Deliverable 1** | Dashboard shell — MudBlazor layout, dark mode, Bento Grid, Hub cards, Command Palette |
 | **UI Deliverable 2** | State & real-time — UniverseViewModel, UniverseMapper, SignalR Intercom listener |
 
@@ -230,7 +262,8 @@ External apps can query Hubs, trigger library scans, and resolve metadata confli
 | **UI Deliverable 5** | Metadata conflict resolution UI — review and resolve flagged Claims |
 | **Automotive Mode** | High-contrast, large-button display mode for TV / in-vehicle use |
 | **Video metadata** | Replace stub video extractor with FFmpeg-based real extractor |
-| **Metadata providers** | TMDB (movies/TV), Open Library (books), MusicBrainz (audiobooks) |
+| **Open Library provider** | ISBN-based book metadata (foundation already in place; one new adapter class) |
+| **TMDB provider** | Movies and TV series metadata |
 | **Mobile companion** | Read-only library browser via the existing Engine API |
 
 ---
@@ -247,6 +280,7 @@ External apps can query Hubs, trigger library scans, and resolve metadata confli
 | UI components | MudBlazor 9 |
 | SignalR client | `Microsoft.AspNetCore.SignalR.Client` |
 | EPUB parsing | VersOne.Epub |
+| HTTP client lifecycle | `Microsoft.Extensions.Http` (IHttpClientFactory, named clients) |
 | API docs | Swashbuckle (`/swagger`) |
 | Tests | xUnit 2, coverlet |
 

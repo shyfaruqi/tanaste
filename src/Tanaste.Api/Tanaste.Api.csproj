@@ -17,6 +17,7 @@
     <ProjectReference Include="..\Tanaste.Intelligence\Tanaste.Intelligence.csproj" />
     <ProjectReference Include="..\Tanaste.Processors\Tanaste.Processors.csproj" />
     <ProjectReference Include="..\Tanaste.Storage\Tanaste.Storage.csproj" />
+    <ProjectReference Include="..\Tanaste.Providers\Tanaste.Providers.csproj" />
   </ItemGroup>
 
 </Project>

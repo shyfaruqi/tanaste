@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Tanaste.Storage.Models;
 
@@ -62,6 +62,19 @@ public sealed class TanasteMasterManifest
     /// </summary>
     [JsonPropertyName("scoring")]
     public ScoringSettings Scoring { get; set; } = new();
+
+    /// <summary>
+    /// Base URLs for external metadata provider APIs.
+    /// Keys match adapter names used in named <c>HttpClient</c> registrations:
+    /// <c>apple_books</c>, <c>audnexus</c>, <c>wikidata_api</c>,
+    /// <c>wikidata_sparql</c>.
+    ///
+    /// Keeping URLs here (not hard-coded in adapters) means a provider endpoint
+    /// change requires only a <c>tanaste_master.json</c> edit — no recompile.
+    /// Spec: Phase 9 – External Metadata Adapters § URL Management.
+    /// </summary>
+    [JsonPropertyName("provider_endpoints")]
+    public Dictionary<string, string> ProviderEndpoints { get; set; } = [];
 }
 
 /// <summary>

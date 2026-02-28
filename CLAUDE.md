@@ -107,6 +107,7 @@ A single power user who wants complete, private control over a large media colle
 | `src/Tanaste.Storage` | The Filing Clerk | Reads and writes the SQLite database. Keeps all library data safe. |
 | `src/Tanaste.Intelligence` | The Analyst | Runs the Weighted Voter system. Scores metadata Claims. Detects duplicates. |
 | `src/Tanaste.Processors` | The Scanner | Opens each file type (EPUB, video, comic) and extracts its embedded information. |
+| `src/Tanaste.Providers` | The Research Team | Fetches enriched metadata from external sources (Apple Books, Audnexus, Wikidata). Runs non-blocking on a background channel. |
 | `src/Tanaste.Ingestion` | The Mail Room | Watches the Watch Folder. Queues new files. Manages the safe move of files into the organised library. |
 | `src/Tanaste.Api` | The Reception Desk | The Engine's public interface. Exposes all features over HTTP. Hosts the real-time intercom. |
 | `src/Tanaste.Web` | The Showroom | The browser Dashboard. Uses the Feature-Sliced layout (see Section 6). |
@@ -216,6 +217,48 @@ Three official SVG logo files exist. **Never replace logo placements with hand-w
 **Color note:** All three SVGs use hardcoded fills: white (`#fff`) for highlight layers and black (default) for the main strokes. They are designed primarily for dark backgrounds (as used in the Dashboard). On light backgrounds, the mark renders as a black design — which is clean and intentional.
 
 **Source files** are in `C:\Users\shaya\OneDrive\Documents\Projects\Tanaste\Graphics\` (outside the repo — designer originals). Do not modify the SVGs in the repo directly; request updated exports from the source files.
+
+### 3.6 — External Metadata Adapters & Recursive Person Enrichment (Phase 9)
+
+**Plain English:** After a file lands in the library, the Engine quietly reaches out to three free online sources — Apple Books, Audnexus, and Wikidata — to fetch better cover art, descriptions, narrator credits, and author portraits. This happens entirely in the background; the file appears on the Dashboard immediately, and the richer information pops in moments later without any page refresh.
+
+**The three zero-key providers (no accounts, no API keys required):**
+
+| Provider | What it contributes | Trust weights |
+|---|---|---|
+| **Apple Books (Ebook)** | Cover art (600×600), description, rating, title | cover 0.85, description 0.85, rating 0.8, title 0.7 |
+| **Apple Books (Audiobook)** | Cover art (600×600), description, rating, title | same profile, separate provider ID |
+| **Audnexus** | Narrator, series, series position, cover art, author | narrator/series/cover/series_pos 0.9, author 0.75 |
+| **Wikidata** | Person headshot (Wikimedia Commons), biography, Q-identifier | qid/headshot/biography 1.0 |
+
+**How it works (the harvest pipeline):**
+
+1. After every file is ingested and scored, a lightweight `HarvestRequest` is placed on a background queue (`Channel<HarvestRequest>`, bounded to 500 items). Ingestion never waits for this.
+2. A background worker (`MetadataHarvestingService`) pulls from the queue with up to 3 concurrent provider calls. First provider that returns data wins for each field; later providers are skipped.
+3. New claims are written to the database and the scoring engine re-runs for those fields. The updated canonical values are upserted.
+4. A `MetadataHarvested` SignalR event fires, and the Dashboard card updates live.
+
+**Recursive Person Enrichment (`RecursiveIdentityService`):**
+
+When a file's metadata contains an author or narrator name, the Engine:
+1. Looks up whether a `Person` record already exists for that name and role. If not, creates one.
+2. Links the person to the media asset (idempotent — safe to run repeatedly).
+3. If the person has not yet been Wikidata-enriched (`EnrichedAt is null`), enqueues a `HarvestRequest` with `EntityType.Person` for Wikidata lookup.
+4. When Wikidata responds, the person record is updated with `WikidataQid`, `HeadshotUrl`, and `Biography`, and a `PersonEnriched` SignalR event fires.
+
+**Key architectural rules for this subsystem:**
+- `Tanaste.Ingestion` has **zero new project references**. All interfaces (`IMetadataHarvestingService`, `IRecursiveIdentityService`, `IMetadataClaimRepository`, `ICanonicalValueRepository`) live in `Tanaste.Domain.Contracts` — which Ingestion already references.
+- All provider base URLs live in `provider_endpoints` in `tanaste_master.json`. Changing a URL requires only a config edit, never a recompile.
+- All trust weights live in the `field_weights` section per provider in `tanaste_master.json`. The engine picks them up automatically.
+- Provider GUIDs are stable hardcoded constants in each adapter class (not looked up from the DB at runtime) so new `MetadataClaim` rows can be written without a DB round-trip.
+- Throttle rules: Apple Books — 300ms between calls; Wikidata — 1100ms between calls (Wikidata's 1 req/sec policy). Audnexus has no throttle.
+- Audnexus requires an ASIN. If none is present in the file's metadata, the adapter short-circuits immediately (no HTTP call made) and returns an empty claim list.
+
+**Why this matters to the business:**
+- **Reliability** — Providers are never in the critical path. A failed network call returns an empty list; the file remains in the library with its local metadata intact.
+- **Performance** — The harvest queue is non-blocking. File ingestion completes in milliseconds regardless of network conditions.
+- **Maintenance** — Adding a new provider is one new class implementing `IExternalMetadataProvider` plus one JSON entry. No existing code changes.
+- **Privacy** — Only titles, authors, and ASINs are sent to external services — no personal data, no usage telemetry, no library structure.
 
 ---
 
@@ -340,6 +383,7 @@ Never guess silently. If Claude is unsure about an approach, it must say so:
 | Swashbuckle.AspNetCore | MIT | Phase 4 (API) |
 | xUnit 2 | Apache 2.0 | Phase 4 (Tests) |
 | coverlet | MIT | Phase 4 (Tests) |
+| Microsoft.Extensions.Http | MIT | Phase 9 (Providers) — `IHttpClientFactory` named HTTP clients |
 
 ### 5.2 — Mandatory Workflow
 
@@ -427,7 +471,7 @@ src/Tanaste.Web/
 │   │   ├── UniverseStateContainer.cs   Per-session cache: hubs, universe view, progress
 │   │   ├── UIOrchestratorService.cs    Orchestrator: bridges HTTP + SignalR + state cache
 │   │   ├── UniverseMapper.cs           Maps Engine data → flat Dashboard view model
-│   │   └── IntercomEvents.cs           SignalR event shapes (MediaAdded, IngestionProgress)
+│   │   └── IntercomEvents.cs           SignalR event shapes (MediaAdded, IngestionProgress, MetadataHarvested, PersonEnriched)
 │   │
 │   └── Theming/              ← ALL visual configuration lives here
 │       └── ThemeService.cs             Dark/light mode, colour palette, corner radii

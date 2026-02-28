@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Tanaste.Domain.Aggregates;
@@ -6,6 +6,7 @@ using Tanaste.Domain.Contracts;
 using Tanaste.Domain.Entities;
 using Tanaste.Domain.Enums;
 using Tanaste.Domain.Events;
+using Tanaste.Domain.Models;
 using Tanaste.Ingestion.Contracts;
 using Tanaste.Ingestion.Models;
 using Tanaste.Intelligence.Contracts;
@@ -59,6 +60,12 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
     private readonly IngestionOptions      _options;
     private readonly ILogger<IngestionEngine> _logger;
 
+    // Phase 9: claim/canonical persistence + external metadata harvesting.
+    private readonly IMetadataClaimRepository    _claimRepo;
+    private readonly ICanonicalValueRepository   _canonicalRepo;
+    private readonly IMetadataHarvestingService  _harvesting;
+    private readonly IRecursiveIdentityService   _identity;
+
     public IngestionEngine(
         IFileWatcher              watcher,
         DebounceQueue             debounce,
@@ -71,20 +78,28 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
         IBackgroundWorker         worker,
         IEventPublisher           publisher,
         IOptions<IngestionOptions> options,
-        ILogger<IngestionEngine>  logger)
+        ILogger<IngestionEngine>  logger,
+        IMetadataClaimRepository   claimRepo,
+        ICanonicalValueRepository  canonicalRepo,
+        IMetadataHarvestingService harvesting,
+        IRecursiveIdentityService  identity)
     {
-        _watcher    = watcher;
-        _debounce   = debounce;
-        _hasher     = hasher;
-        _processors = processors;
-        _scorer     = scorer;
-        _organizer  = organizer;
-        _taggers    = taggers;
-        _assetRepo  = assetRepo;
-        _worker     = worker;
-        _publisher  = publisher;
-        _options    = options.Value;
-        _logger     = logger;
+        _watcher       = watcher;
+        _debounce      = debounce;
+        _hasher        = hasher;
+        _processors    = processors;
+        _scorer        = scorer;
+        _organizer     = organizer;
+        _taggers       = taggers;
+        _assetRepo     = assetRepo;
+        _worker        = worker;
+        _publisher     = publisher;
+        _options       = options.Value;
+        _logger        = logger;
+        _claimRepo     = claimRepo;
+        _canonicalRepo = canonicalRepo;
+        _harvesting    = harvesting;
+        _identity      = identity;
     }
 
     // =========================================================================
@@ -253,6 +268,22 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
 
         var scored = await _scorer.ScoreEntityAsync(scoringContext, ct).ConfigureAwait(false);
 
+        // Phase 9: persist claims (append-only; enables re-scoring on weight changes).
+        await _claimRepo.InsertBatchAsync(claims, ct).ConfigureAwait(false);
+
+        // Phase 9: persist canonical values (current winning metadata for this asset).
+        var canonicals = scored.FieldScores
+            .Where(f => !string.IsNullOrEmpty(f.WinningValue))
+            .Select(f => new CanonicalValue
+            {
+                EntityId     = assetId,
+                Key          = f.Key,
+                Value        = f.WinningValue!,
+                LastScoredAt = scored.ScoredAt,
+            })
+            .ToList();
+        await _canonicalRepo.UpsertBatchAsync(canonicals, ct).ConfigureAwait(false);
+
         // Enrich the candidate with resolved metadata.
         candidate.Metadata          = BuildMetadataDict(scored);
         candidate.DetectedMediaType = result.DetectedType;
@@ -282,6 +313,20 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
             candidate.Path,
             result.DetectedType.ToString(),
             DateTimeOffset.UtcNow), ct).ConfigureAwait(false);
+
+        // Phase 9: enqueue non-blocking external metadata harvest.
+        await _harvesting.EnqueueAsync(new HarvestRequest
+        {
+            EntityId   = assetId,
+            EntityType = EntityType.MediaAsset,
+            MediaType  = result.DetectedType,
+            Hints      = BuildHints(candidate.Metadata),
+        }, ct).ConfigureAwait(false);
+
+        // Phase 9: trigger recursive person enrichment for authors/narrators.
+        var persons = ExtractPersonReferences(candidate.Metadata);
+        if (persons.Count > 0)
+            await _identity.EnrichAsync(assetId, persons, ct).ConfigureAwait(false);
 
         // Step 11: auto-organize.
         string currentPath = candidate.Path;
@@ -460,6 +505,49 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
     }
 
     /// <summary>
+    /// Builds a hint dictionary from the resolved canonical metadata for use
+    /// in a <see cref="HarvestRequest"/>.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> BuildHints(
+        IReadOnlyDictionary<string, string>? metadata)
+    {
+        if (metadata is null or { Count: 0 })
+            return new Dictionary<string, string>();
+
+        var hints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in new[] { "title", "author", "narrator", "asin", "isbn" })
+        {
+            if (metadata.TryGetValue(key, out var value) &&
+                !string.IsNullOrWhiteSpace(value))
+                hints[key] = value;
+        }
+        return hints;
+    }
+
+    /// <summary>
+    /// Extracts author and narrator person references from resolved metadata.
+    /// Returns an empty list if neither field is present.
+    /// </summary>
+    private static IReadOnlyList<PersonReference> ExtractPersonReferences(
+        IReadOnlyDictionary<string, string>? metadata)
+    {
+        if (metadata is null or { Count: 0 })
+            return [];
+
+        var refs = new List<PersonReference>();
+
+        if (metadata.TryGetValue("author", out var author) &&
+            !string.IsNullOrWhiteSpace(author))
+            refs.Add(new PersonReference("Author", author.Trim()));
+
+        if (metadata.TryGetValue("narrator", out var narrator) &&
+            !string.IsNullOrWhiteSpace(narrator))
+            refs.Add(new PersonReference("Narrator", narrator.Trim()));
+
+        return refs;
+    }
+
+    /// <summary>
     /// Publishes an event without propagating exceptions to the calling pipeline.
     /// A publish failure (e.g. transient SignalR error) must never abort file ingestion.
     /// </summary>
@@ -473,7 +561,7 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Event publish failed for '{Event}' — pipeline continues", eventName);
+        _logger.LogDebug(ex, "Event publish failed for '{Event}' \xe2\x80\x94 pipeline continues", eventName);
         }
     }
 }

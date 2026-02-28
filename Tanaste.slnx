@@ -6,6 +6,7 @@
     <Project Path="src/Tanaste.Intelligence/Tanaste.Intelligence.csproj" />
     <Project Path="src/Tanaste.Processors/Tanaste.Processors.csproj" />
     <Project Path="src/Tanaste.Storage/Tanaste.Storage.csproj" />
+    <Project Path="src/Tanaste.Providers/Tanaste.Providers.csproj" />
     <Project Path="src/Tanaste.Web/Tanaste.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -14,5 +15,6 @@
     <Project Path="tests/Tanaste.Intelligence.Tests/Tanaste.Intelligence.Tests.csproj" />
     <Project Path="tests/Tanaste.Processors.Tests/Tanaste.Processors.Tests.csproj" />
     <Project Path="tests/Tanaste.Storage.Tests/Tanaste.Storage.Tests.csproj" />
+    <Project Path="tests/Tanaste.Providers.Tests/Tanaste.Providers.Tests.csproj" />
   </Folder>
 </Solution>

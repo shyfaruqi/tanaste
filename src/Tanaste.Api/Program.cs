@@ -14,6 +14,10 @@ using Tanaste.Processors.Contracts;
 using Tanaste.Processors.Processors;
 using Tanaste.Storage;
 using Tanaste.Storage.Contracts;
+using Tanaste.Domain.Enums;
+using Tanaste.Providers.Adapters;
+using Tanaste.Providers.Contracts;
+using Tanaste.Providers.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 var config  = builder.Configuration;
@@ -114,6 +118,53 @@ builder.Services.AddSingleton<IBackgroundWorker, BackgroundWorker>();
 // never starts in the API process. Only DryRunAsync is needed here.
 builder.Services.AddSingleton<IngestionEngine>();
 builder.Services.AddSingleton<IIngestionEngine>(sp => sp.GetRequiredService<IngestionEngine>());
+
+// ── External Metadata Providers (Phase 9 — Zero-Key) ─────────────────────────
+// Named HttpClients: lifecycle managed by IHttpClientFactory.
+builder.Services.AddHttpClient("apple_books", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddHttpClient("audnexus", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(10);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Tanaste/1.0");
+});
+builder.Services.AddHttpClient("wikidata_api", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(15);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "Tanaste/1.0 (https://github.com/shyfaruqi/tanaste)");
+});
+builder.Services.AddHttpClient("wikidata_sparql", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(15);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "Tanaste/1.0 (https://github.com/shyfaruqi/tanaste)");
+});
+
+// Storage repositories (Phase 9 — claim + canonical + person persistence).
+builder.Services.AddSingleton<IMetadataClaimRepository,  MetadataClaimRepository>();
+builder.Services.AddSingleton<ICanonicalValueRepository, CanonicalValueRepository>();
+builder.Services.AddSingleton<IPersonRepository,         PersonRepository>();
+
+// Provider adapters — each registered as IExternalMetadataProvider so
+// MetadataHarvestingService receives them as IEnumerable<IExternalMetadataProvider>.
+builder.Services.AddSingleton<IExternalMetadataProvider>(sp =>
+    new AppleBooksAdapter(
+        sp.GetRequiredService<IHttpClientFactory>(),
+        MediaType.Epub,
+        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AppleBooksAdapter>>()));
+builder.Services.AddSingleton<IExternalMetadataProvider>(sp =>
+    new AppleBooksAdapter(
+        sp.GetRequiredService<IHttpClientFactory>(),
+        MediaType.Audiobook,
+        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AppleBooksAdapter>>()));
+builder.Services.AddSingleton<IExternalMetadataProvider, AudnexusAdapter>();
+builder.Services.AddSingleton<IExternalMetadataProvider, WikidataAdapter>();
+
+builder.Services.AddSingleton<IMetadataHarvestingService, MetadataHarvestingService>();
+builder.Services.AddSingleton<IRecursiveIdentityService,  RecursiveIdentityService>();
 
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();

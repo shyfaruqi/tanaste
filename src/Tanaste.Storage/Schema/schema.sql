@@ -1,13 +1,13 @@
 -- =============================================================================
--- Tanaste – SQLite Initialisation Script
+-- Tanaste â€“ SQLite Initialisation Script
 -- Phase 4: Storage Schema & Persistent State
 --
 -- Conventions
---   • UUIDs are stored as TEXT (SQLite has no native UUID type).
---   • BOOLEAN is stored as INTEGER: 1 = true, 0 = false.
---   • DATETIME is stored as TEXT in ISO-8601 format (datetime('now') default).
---   • All CREATE statements are idempotent (IF NOT EXISTS).
---   • Foreign keys are enforced; enable them per-connection with PRAGMA.
+--   â€¢ UUIDs are stored as TEXT (SQLite has no native UUID type).
+--   â€¢ BOOLEAN is stored as INTEGER: 1 = true, 0 = false.
+--   â€¢ DATETIME is stored as TEXT in ISO-8601 format (datetime('now') default).
+--   â€¢ All CREATE statements are idempotent (IF NOT EXISTS).
+--   â€¢ Foreign keys are enforced; enable them per-connection with PRAGMA.
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -92,23 +92,23 @@ CREATE TABLE IF NOT EXISTS media_assets (
 -- SQLite cannot enforce polymorphic FKs, so it is left as plain TEXT.
 CREATE TABLE IF NOT EXISTS metadata_claims (
     id          TEXT NOT NULL PRIMARY KEY,  -- UUID
-    entity_id   TEXT NOT NULL,              -- FK → works.id | editions.id (polymorphic)
+    entity_id   TEXT NOT NULL,              -- FK â†’ works.id | editions.id (polymorphic)
     provider_id TEXT NOT NULL REFERENCES provider_registry(id),
     claim_key   TEXT NOT NULL,
     claim_value TEXT NOT NULL,
     confidence  REAL NOT NULL DEFAULT 1.0,
     -- Timestamp used by the scoring engine for stale-claim time-decay.
-    -- Spec: Phase 6 – Stale Claim Handling.
+    -- Spec: Phase 6 â€“ Stale Claim Handling.
     claimed_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     -- When 1, the scoring engine treats this claim as unconditional winner
     -- (confidence 1.0); no automated provider may set this to 1.
-    -- Spec: Phase 8 – Field-Level Arbitration § User-Locked Claims.
+    -- Spec: Phase 8 â€“ Field-Level Arbitration Â§ User-Locked Claims.
     is_user_locked INTEGER NOT NULL DEFAULT 0
                        CHECK (is_user_locked IN (0, 1))
 );
 
 -- Composite PK (entity_id, key) forms the property-bag for canonical values.
--- Every row here MUST be derivable from ≥1 rows in metadata_claims
+-- Every row here MUST be derivable from â‰¥1 rows in metadata_claims
 -- (spec: Canonical Integrity invariant).
 CREATE TABLE IF NOT EXISTS canonical_values (
     entity_id      TEXT NOT NULL,
@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS canonical_values (
 
 -- Composite PK (user_id, asset_id) binds progress to a specific media asset.
 -- Reconciliation is via media_assets.content_hash, ensuring user_states survive
--- file moves (spec: Hash Dominance invariant – enforced at application layer).
+-- file moves (spec: Hash Dominance invariant â€“ enforced at application layer).
 CREATE TABLE IF NOT EXISTS user_states (
     user_id       TEXT NOT NULL,
     asset_id      TEXT NOT NULL REFERENCES media_assets(id) ON DELETE CASCADE,
@@ -161,6 +161,38 @@ CREATE TABLE IF NOT EXISTS api_keys (
 
 
 -- =============================================================================
+-- 6. PERSONS & PERSON-ASSET LINKS
+-- Spec: Phase 9 - Recursive Person Enrichment
+-- =============================================================================
+
+-- Authors, narrators, and directors linked to media assets.
+-- Persons are created when file metadata contains author/narrator fields and
+-- enriched asynchronously via the Wikidata adapter.
+-- role CHECK mirrors the valid values accepted by IPersonRepository.
+CREATE TABLE IF NOT EXISTS persons (
+    id           TEXT NOT NULL PRIMARY KEY,  -- UUID
+    name         TEXT NOT NULL,
+    role         TEXT NOT NULL CHECK (role IN ('Author', 'Narrator', 'Director')),
+    wikidata_qid TEXT,                       -- e.g. Q42
+    headshot_url TEXT,                       -- Wikimedia Commons image URL
+    biography    TEXT,                       -- Wikidata entity description
+    created_at   TEXT NOT NULL,              -- ISO-8601
+    enriched_at  TEXT                        -- NULL = not yet enriched
+);
+
+-- Junction table linking persons to the media assets they contributed to.
+-- Uses media_assets.id (not works.id) because Work entities are not yet
+-- created by the ingestion pipeline (pre-existing Phase 7 gap).
+-- Composite PK prevents duplicate links for the same (asset, person, role).
+CREATE TABLE IF NOT EXISTS person_media_links (
+    media_asset_id  TEXT NOT NULL REFERENCES media_assets(id) ON DELETE CASCADE,
+    person_id       TEXT NOT NULL REFERENCES persons(id)       ON DELETE CASCADE,
+    role            TEXT NOT NULL,
+    PRIMARY KEY (media_asset_id, person_id, role)
+);
+
+
+-- =============================================================================
 -- INDICES
 -- Spec: O(log n) lookup on content_hash, entity_id (claims), hub_id (works)
 -- =============================================================================
@@ -176,3 +208,9 @@ CREATE INDEX IF NOT EXISTS idx_works_hub_id
 
 CREATE INDEX IF NOT EXISTS idx_api_keys_hashed_key
     ON api_keys (hashed_key);
+
+CREATE INDEX IF NOT EXISTS idx_persons_name
+    ON persons (name);
+
+CREATE INDEX IF NOT EXISTS idx_person_media_links_asset
+    ON person_media_links (media_asset_id);

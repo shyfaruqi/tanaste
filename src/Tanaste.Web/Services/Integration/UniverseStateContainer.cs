@@ -1,4 +1,4 @@
-using Tanaste.Web.Models.ViewDTOs;
+﻿using Tanaste.Web.Models.ViewDTOs;
 
 namespace Tanaste.Web.Services.Integration;
 
@@ -21,6 +21,7 @@ public sealed class UniverseStateContainer
     private UniverseViewModel?      _universe;
     private bool                    _loaded;
     private IngestionProgressEvent? _ingestionProgress;
+    private readonly List<PersonEnrichedEvent> _personUpdates = [];
 
     // ── Read-only surface ─────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ public sealed class UniverseStateContainer
     /// Null when no ingestion is in progress or the circuit is freshly created.
     /// </summary>
     public IngestionProgressEvent?     IngestionProgress => _ingestionProgress;
+    public IReadOnlyList<PersonEnrichedEvent> RecentPersonUpdates => _personUpdates;
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -103,4 +105,17 @@ public sealed class UniverseStateContainer
     /// with the new Work included.
     /// </summary>
     public void PushMediaAdded(MediaAddedEvent ev) => Invalidate();
+
+    /// <summary>
+    /// Called when a <c>"PersonEnriched"</c> event arrives on the Intercom hub.
+    /// Keeps a rolling buffer of the 50 most recent person updates.
+    /// </summary>
+    public void PushPersonEnriched(PersonEnrichedEvent ev)
+    {
+        _personUpdates.Add(ev);
+        // Keep only the 50 most recent person updates to avoid unbounded growth.
+        if (_personUpdates.Count > 50)
+            _personUpdates.RemoveAt(0);
+        OnStateChanged?.Invoke();
+    }
 }
