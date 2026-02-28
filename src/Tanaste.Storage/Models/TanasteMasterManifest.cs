@@ -48,6 +48,23 @@ public sealed class TanasteMasterManifest
     [JsonPropertyName("data_root")]
     public string DataRoot { get; set; } = "./media";
 
+    /// <summary>
+    /// Directory that the FileSystemWatcher monitors for new incoming files.
+    /// When set, this value overrides the <c>Ingestion:WatchDirectory</c> entry
+    /// in <c>appsettings.json</c> at startup via <c>PostConfigure&lt;IngestionOptions&gt;</c>.
+    /// Empty string = use <c>appsettings.json</c> as fallback.
+    /// </summary>
+    [JsonPropertyName("watch_directory")]
+    public string WatchDirectory { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Root directory where the organised media library lives.
+    /// When set, this value overrides <c>Ingestion:LibraryRoot</c> in
+    /// <c>appsettings.json</c> at startup.
+    /// </summary>
+    [JsonPropertyName("library_root")]
+    public string LibraryRoot { get; set; } = string.Empty;
+
     /// <summary>Provider bootstrap entries loaded before the provider_registry table is queried.</summary>
     [JsonPropertyName("providers")]
     public List<ProviderBootstrap> Providers { get; set; } = [];

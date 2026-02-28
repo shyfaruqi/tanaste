@@ -79,3 +79,15 @@ public sealed record PersonEnrichedEvent(
     string  Name,
     string? HeadshotUrl,
     string? WikidataQid);
+
+/// <summary>
+/// Payload broadcast when the Watch Folder is updated at runtime — either on first
+/// configuration or after the user changes the path in Settings.
+///
+/// SignalR method name: <c>"WatchFolderActive"</c>
+/// </summary>
+/// <param name="WatchDirectory">The absolute path now being monitored.</param>
+/// <param name="ActivatedAt">UTC timestamp of when the new path became active.</param>
+public sealed record WatchFolderActiveEvent(
+    string         WatchDirectory,
+    DateTimeOffset ActivatedAt);

@@ -23,3 +23,11 @@ public sealed record IngestionFailedEvent(
     string FilePath,
     string Reason,
     DateTimeOffset FailedAt);
+
+/// <summary>
+/// Published via SignalR when the Watch Folder is updated at runtime — either on first
+/// configuration or after the user changes the path in Settings.
+/// </summary>
+public sealed record WatchFolderActiveEvent(
+    string WatchDirectory,
+    DateTimeOffset ActivatedAt);

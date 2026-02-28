@@ -96,6 +96,37 @@ public sealed class FileWatcher : IFileWatcher
             w.EnableRaisingEvents = false;
     }
 
+    /// <inheritdoc/>
+    public void UpdateDirectory(string path, bool includeSubdirectories = true)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // Pause all existing watchers so no new events arrive while we swap.
+        foreach (var w in _watchers)
+            w.EnableRaisingEvents = false;
+
+        // Unsubscribe and fully release every FileSystemWatcher.
+        foreach (var w in _watchers)
+        {
+            w.Created -= OnCreated;
+            w.Changed -= OnChanged;
+            w.Deleted -= OnDeleted;
+            w.Renamed -= OnRenamed;
+            w.Error   -= OnError;
+            w.Dispose();
+        }
+        _watchers.Clear();
+
+        // Wire the new directory.  AddDirectory() subscribes the same handlers
+        // and appends the new watcher to _watchers.
+        AddDirectory(path, includeSubdirectories);
+
+        // Resume immediately if the watcher was running before the swap.
+        if (_running)
+            foreach (var w in _watchers)
+                w.EnableRaisingEvents = true;
+    }
+
     // -------------------------------------------------------------------------
     // IDisposable
     // -------------------------------------------------------------------------

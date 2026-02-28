@@ -7,14 +7,102 @@
 
 <PageTitle>Settings — Tanaste</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-1">Settings</MudText>
+<MudText Typo="Typo.h4" Class="mb-1">System Hub</MudText>
 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
-    Manage Guest API Keys and Engine configuration.
+    Configure where Tanaste looks for files, manage access keys, and monitor source connections.
 </MudText>
 
-@* ── Guest API Keys ──────────────────────────────────────────────────────── *@
-<MudPaper Class="pa-6 mb-6" Elevation="2"
-          Style="border-radius: 20px; border: 1px solid rgba(255,255,255,0.07);">
+@* ── Section 1: File Management ───────────────────────────────────────────── *@
+<MudPaper Elevation="0" Style="@GlassStyle">
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Outlined.FolderOpen" Color="Color.Primary" Class="mr-2" />
+        <MudText Typo="Typo.h6">File Management</MudText>
+    </MudStack>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+        Tell me where to find and keep your media.
+    </MudText>
+
+    @* Watch Folder *@
+    <MudText Typo="Typo.subtitle2" Class="mb-1">Watch Folder</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+        Where should I look for new files?
+    </MudText>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+        <MudTextField @bind-Value="_watchDir"
+                      Placeholder="/path/to/watch"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Immediate="true"
+                      Margin="Margin.Dense" />
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   OnClick="@TestWatchPathAsync"
+                   Disabled="@(string.IsNullOrWhiteSpace(_watchDir) || _testingWatch)"
+                   Style="white-space: nowrap; min-width: 110px;">
+            @(_testingWatch ? "Testing…" : "Test Path")
+        </MudButton>
+    </MudStack>
+    @if (_watchTestResult is not null)
+    {
+        <MudChip T="string"
+                 Color="@GetTestColor(_watchTestResult)"
+                 Size="Size.Small"
+                 Class="mb-5">
+            @GetTestLabel(_watchTestResult)
+        </MudChip>
+    }
+    else
+    {
+        <div class="mb-5" />
+    }
+
+    @* Library Folder *@
+    <MudText Typo="Typo.subtitle2" Class="mb-1">Library Folder</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+        Where should my organised library live?
+    </MudText>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+        <MudTextField @bind-Value="_libraryRoot"
+                      Placeholder="/path/to/library"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Immediate="true"
+                      Margin="Margin.Dense" />
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   OnClick="@TestLibraryPathAsync"
+                   Disabled="@(string.IsNullOrWhiteSpace(_libraryRoot) || _testingLib)"
+                   Style="white-space: nowrap; min-width: 110px;">
+            @(_testingLib ? "Testing…" : "Test Path")
+        </MudButton>
+    </MudStack>
+    @if (_libTestResult is not null)
+    {
+        <MudChip T="string"
+                 Color="@GetTestColor(_libTestResult)"
+                 Size="Size.Small"
+                 Class="mb-5">
+            @GetTestLabel(_libTestResult)
+        </MudChip>
+    }
+    else
+    {
+        <div class="mb-5" />
+    }
+
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               FullWidth="true"
+               OnClick="@SaveFoldersAsync"
+               Disabled="@_savingFolders">
+        @(_savingFolders ? "Saving…" : "Save Changes")
+    </MudButton>
+
+</MudPaper>
+
+@* ── Section 2: Guest API Keys ────────────────────────────────────────────── *@
+<MudPaper Elevation="0" Style="@GlassStyle">
 
     <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
         <MudIcon Icon="@Icons.Material.Filled.VpnKey" Color="Color.Primary" Class="mr-2" />
@@ -75,6 +163,58 @@
                 </MudTd>
             </RowTemplate>
         </MudTable>
+    }
+</MudPaper>
+
+@* ── Section 3: Live Provider Status ─────────────────────────────────────── *@
+<MudPaper Elevation="0" Style="@GlassStyleLast">
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Outlined.Cloud" Color="Color.Primary" Class="mr-2" />
+        <MudText Typo="Typo.h6">Live Provider Status</MudText>
+    </MudStack>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        These are the sources I use to enrich your library.
+    </MudText>
+
+    @if (_loadingProviders)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_providers.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">
+            No providers are configured. Add provider entries to your manifest to see status here.
+        </MudAlert>
+    }
+    else
+    {
+        @foreach (var p in _providers)
+        {
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2"
+                      Class="py-2"
+                      Style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <MudIcon Icon="@Icons.Material.Filled.Circle"
+                         Color="@(p.IsReachable ? Color.Success : Color.Error)"
+                         Size="Size.Small" />
+                <MudText Style="flex: 1; min-width: 0;">@p.DisplayName</MudText>
+                @if (p.IsZeroKey)
+                {
+                    <MudChip T="string"
+                             Color="Color.Warning"
+                             Size="Size.Small"
+                             Variant="Variant.Outlined">
+                        Zero-key
+                    </MudChip>
+                }
+                <MudChip T="string"
+                         Color="@(p.IsReachable ? Color.Success : Color.Error)"
+                         Size="Size.Small"
+                         Variant="Variant.Outlined">
+                    @(p.IsReachable ? "Reachable" : "Unreachable")
+                </MudChip>
+            </MudStack>
+        }
     }
 </MudPaper>
 
@@ -139,21 +279,78 @@
 </MudDialog>
 
 @code {
-    private bool                     _loading        = true;
-    private List<ApiKeyViewModel>    _keys           = [];
-    private bool                     _generateOpen   = false;
-    private bool                     _generating     = false;
-    private string                   _newLabel       = string.Empty;
-    private NewApiKeyViewModel?      _newKey         = null;
+
+    // ── Glass card styles ─────────────────────────────────────────────────────
+
+    private const string GlassStyle =
+        "background: rgba(22,22,36,0.55); " +
+        "border: 1px solid rgba(255,255,255,0.08); " +
+        "backdrop-filter: blur(10px); " +
+        "-webkit-backdrop-filter: blur(10px); " +
+        "border-radius: 24px; " +
+        "padding: 32px; " +
+        "margin-bottom: 24px;";
+
+    // Last card omits the bottom margin so it doesn't leave orphan space.
+    private const string GlassStyleLast =
+        "background: rgba(22,22,36,0.55); " +
+        "border: 1px solid rgba(255,255,255,0.08); " +
+        "backdrop-filter: blur(10px); " +
+        "-webkit-backdrop-filter: blur(10px); " +
+        "border-radius: 24px; " +
+        "padding: 32px;";
+
+    // ── File Management state ─────────────────────────────────────────────────
+
+    private string           _watchDir       = string.Empty;
+    private string           _libraryRoot    = string.Empty;
+    private PathTestResultDto? _watchTestResult;
+    private PathTestResultDto? _libTestResult;
+    private bool             _testingWatch;
+    private bool             _testingLib;
+    private bool             _savingFolders;
+
+    // ── Guest API Keys state ──────────────────────────────────────────────────
+
+    private bool                  _loading      = true;
+    private List<ApiKeyViewModel> _keys         = [];
+    private bool                  _generateOpen;
+    private bool                  _generating;
+    private string                _newLabel     = string.Empty;
+    private NewApiKeyViewModel?   _newKey;
 
     private readonly DialogOptions _dialogOptions = new()
     {
-        MaxWidth     = MaxWidth.Small,
-        FullWidth    = true,
+        MaxWidth         = MaxWidth.Small,
+        FullWidth        = true,
         CloseOnEscapeKey = true,
     };
 
-    protected override async Task OnInitializedAsync() => await RefreshKeysAsync();
+    // ── Provider Status state ─────────────────────────────────────────────────
+
+    private bool                         _loadingProviders = true;
+    private IReadOnlyList<ProviderStatusDto> _providers    = [];
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load all three sections concurrently so the page renders quickly.
+        await Task.WhenAll(
+            LoadFolderSettingsAsync(),
+            RefreshKeysAsync(),
+            LoadProvidersAsync());
+    }
+
+    private async Task LoadFolderSettingsAsync()
+    {
+        var settings = await Orchestrator.GetFolderSettingsAsync();
+        if (settings is not null)
+        {
+            _watchDir    = settings.WatchDirectory;
+            _libraryRoot = settings.LibraryRoot;
+        }
+    }
 
     private async Task RefreshKeysAsync()
     {
@@ -161,6 +358,87 @@
         _keys    = await Orchestrator.GetApiKeysAsync();
         _loading = false;
     }
+
+    private async Task LoadProvidersAsync()
+    {
+        _loadingProviders = true;
+        _providers        = await Orchestrator.GetProviderStatusAsync();
+        _loadingProviders = false;
+    }
+
+    // ── File Management handlers ──────────────────────────────────────────────
+
+    private async Task TestWatchPathAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_watchDir)) return;
+        _testingWatch    = true;
+        _watchTestResult = await Orchestrator.TestPathAsync(_watchDir);
+        _testingWatch    = false;
+    }
+
+    private async Task TestLibraryPathAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_libraryRoot)) return;
+        _testingLib    = true;
+        _libTestResult = await Orchestrator.TestPathAsync(_libraryRoot);
+        _testingLib    = false;
+    }
+
+    private async Task SaveFoldersAsync()
+    {
+        _savingFolders = true;
+
+        // Validate Watch Folder (required — must have read + write).
+        if (!string.IsNullOrWhiteSpace(_watchDir))
+        {
+            var r = await Orchestrator.TestPathAsync(_watchDir);
+            _watchTestResult = r;
+            if (r is not { HasRead: true, HasWrite: true })
+            {
+                Snackbar.Add("Watch Folder is not accessible — please check the path and permissions.",
+                    Severity.Error);
+                _savingFolders = false;
+                return;
+            }
+        }
+
+        // Validate Library Folder (optional — if provided, must have read + write).
+        if (!string.IsNullOrWhiteSpace(_libraryRoot))
+        {
+            var r = await Orchestrator.TestPathAsync(_libraryRoot);
+            _libTestResult = r;
+            if (r is not { HasRead: true, HasWrite: true })
+            {
+                Snackbar.Add("Library Folder is not accessible — please check the path and permissions.",
+                    Severity.Error);
+                _savingFolders = false;
+                return;
+            }
+        }
+
+        var dto     = new FolderSettingsDto(_watchDir, _libraryRoot);
+        var success = await Orchestrator.UpdateFolderSettingsAsync(dto);
+
+        if (success)
+            Snackbar.Add($"Watch Folder active — now watching {_watchDir}", Severity.Success);
+        else
+            Snackbar.Add("Could not save folder settings — is the Engine running?", Severity.Error);
+
+        _savingFolders = false;
+    }
+
+    private static Color GetTestColor(PathTestResultDto r) =>
+        !r.Exists              ? Color.Error   :
+        r.HasRead && r.HasWrite ? Color.Success :
+                                  Color.Warning;
+
+    private static string GetTestLabel(PathTestResultDto r) =>
+        !r.Exists               ? "Folder not found"              :
+        r.HasRead && r.HasWrite  ? "Read & Write access confirmed" :
+        r.HasRead               ? "Read only — cannot write"      :
+                                   "Access denied";
+
+    // ── Access Keys handlers ──────────────────────────────────────────────────
 
     private void OpenGenerateDialog()
     {

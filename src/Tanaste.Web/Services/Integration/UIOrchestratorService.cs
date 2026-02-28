@@ -135,6 +135,24 @@ public sealed class UIOrchestratorService : IAsyncDisposable
     public Task<bool> RevokeApiKeyAsync(Guid id, CancellationToken ct = default)
         => _api.RevokeApiKeyAsync(id, ct);
 
+    // ── Settings ──────────────────────────────────────────────────────────────
+
+    /// <summary>Returns the current Watch Folder and Library Folder configuration.</summary>
+    public Task<FolderSettingsDto?> GetFolderSettingsAsync(CancellationToken ct = default)
+        => _api.GetFolderSettingsAsync(ct);
+
+    /// <summary>Saves updated folder paths to the Engine manifest and hot-swaps the file watcher.</summary>
+    public Task<bool> UpdateFolderSettingsAsync(FolderSettingsDto settings, CancellationToken ct = default)
+        => _api.UpdateFolderSettingsAsync(settings, ct);
+
+    /// <summary>Probes a directory path for existence, read, and write access.</summary>
+    public Task<PathTestResultDto?> TestPathAsync(string path, CancellationToken ct = default)
+        => _api.TestPathAsync(path, ct);
+
+    /// <summary>Returns enabled state and live reachability for all registered metadata providers.</summary>
+    public Task<IReadOnlyList<ProviderStatusDto>> GetProviderStatusAsync(CancellationToken ct = default)
+        => _api.GetProviderStatusAsync(ct);
+
     // ── SignalR Intercom ───────────────────────────────────────────────────────
 
     /// <summary>
@@ -213,6 +231,17 @@ public sealed class UIOrchestratorService : IAsyncDisposable
                 "Intercom ← PersonEnriched: PersonId={Id} Name={Name}",
                 ev.PersonId, ev.Name);
             _state.PushPersonEnriched(ev);
+        });
+
+        // ── "WatchFolderActive" ───────────────────────────────────────────────
+        // The Watch Folder has been updated; notify state container so interested
+        // components (e.g. Settings page connection indicator) can react.
+        _hubConnection.On<WatchFolderActiveEvent>("WatchFolderActive", ev =>
+        {
+            _logger.LogInformation(
+                "Intercom ← WatchFolderActive: Dir={Dir} At={At}",
+                ev.WatchDirectory, ev.ActivatedAt);
+            _state.PushWatchFolderActive(ev);
         });
 
         // ── Connection lifecycle logging ──────────────────────────────────────

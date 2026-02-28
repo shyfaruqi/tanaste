@@ -270,3 +270,66 @@ public sealed class ResolveResponse
     [JsonPropertyName("resolved_at")]
     public DateTimeOffset ResolvedAt { get; init; }
 }
+
+// ── GET /settings/folders ──────────────────────────────────────────────────────
+
+public sealed class FolderSettingsResponse
+{
+    [JsonPropertyName("watch_directory")]
+    public string WatchDirectory { get; init; } = string.Empty;
+
+    [JsonPropertyName("library_root")]
+    public string LibraryRoot { get; init; } = string.Empty;
+}
+
+public sealed class UpdateFoldersRequest
+{
+    [JsonPropertyName("watch_directory")]
+    public string? WatchDirectory { get; init; }
+
+    [JsonPropertyName("library_root")]
+    public string? LibraryRoot { get; init; }
+}
+
+// ── POST /settings/test-path ───────────────────────────────────────────────────
+
+public sealed class TestPathRequest
+{
+    [JsonPropertyName("path")]
+    public string Path { get; init; } = string.Empty;
+}
+
+public sealed class TestPathResponse
+{
+    [JsonPropertyName("path")]
+    public string Path { get; init; } = string.Empty;
+
+    [JsonPropertyName("exists")]
+    public bool Exists { get; init; }
+
+    [JsonPropertyName("has_read")]
+    public bool HasRead { get; init; }
+
+    [JsonPropertyName("has_write")]
+    public bool HasWrite { get; init; }
+}
+
+// ── GET /settings/providers ────────────────────────────────────────────────────
+
+public sealed class ProviderStatusResponse
+{
+    [JsonPropertyName("name")]
+    public string Name { get; init; } = string.Empty;
+
+    [JsonPropertyName("display_name")]
+    public string DisplayName { get; init; } = string.Empty;
+
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; init; }
+
+    [JsonPropertyName("is_zero_key")]
+    public bool IsZeroKey { get; init; }
+
+    [JsonPropertyName("is_reachable")]
+    public bool IsReachable { get; init; }
+}

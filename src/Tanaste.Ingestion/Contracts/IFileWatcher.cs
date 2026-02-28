@@ -29,4 +29,18 @@ public interface IFileWatcher : IDisposable
 
     /// <summary>Pauses event raising without releasing OS resources.</summary>
     void Stop();
+
+    /// <summary>
+    /// Atomically replaces the currently watched directory with <paramref name="path"/>.
+    /// Stops all existing <see cref="System.IO.FileSystemWatcher"/> instances, disposes
+    /// them, and starts a fresh watcher on the new path.  If the watcher was running
+    /// before the call it resumes immediately on the new path.
+    /// </summary>
+    /// <param name="path">New directory to observe.</param>
+    /// <param name="includeSubdirectories">
+    /// Whether subdirectories under <paramref name="path"/> should also be monitored.
+    /// </param>
+    /// <exception cref="ObjectDisposedException">Thrown if the watcher has been disposed.</exception>
+    /// <exception cref="DirectoryNotFoundException">Thrown when <paramref name="path"/> does not exist.</exception>
+    void UpdateDirectory(string path, bool includeSubdirectories = true);
 }

@@ -106,6 +106,26 @@ builder.Services.AddSingleton<IHubArbiter>(sp =>
 
 // ── Ingestion (for POST /ingestion/scan) ─────────────────────────────────────
 builder.Services.Configure<IngestionOptions>(config.GetSection(IngestionOptions.SectionName));
+
+// PostConfigure reads saved folder paths from the manifest and overrides the
+// IngestionOptions values bound from appsettings.json.  This means a path
+// saved via PUT /settings/folders survives an Engine restart without touching
+// appsettings.json — the manifest is the persistent source of truth.
+builder.Services.PostConfigure<IngestionOptions>(opts =>
+{
+    try
+    {
+        var mp = config["Tanaste:ManifestPath"] ?? "tanaste_master.json";
+        var m  = new Tanaste.Storage.ManifestParser(mp).Load();
+        if (!string.IsNullOrWhiteSpace(m.WatchDirectory)) opts.WatchDirectory = m.WatchDirectory;
+        if (!string.IsNullOrWhiteSpace(m.LibraryRoot))    opts.LibraryRoot    = m.LibraryRoot;
+    }
+    catch
+    {
+        // First run — manifest may not yet have folder keys; appsettings.json values stand.
+    }
+});
+
 builder.Services.AddSingleton<IAssetHasher, AssetHasher>();
 builder.Services.AddSingleton<IFileWatcher, FileWatcher>();
 builder.Services.AddSingleton<DebounceQueue>();
@@ -121,6 +141,13 @@ builder.Services.AddSingleton<IIngestionEngine>(sp => sp.GetRequiredService<Inge
 
 // ── External Metadata Providers (Phase 9 — Zero-Key) ─────────────────────────
 // Named HttpClients: lifecycle managed by IHttpClientFactory.
+// Short-lived probe client used by GET /settings/providers to test reachability.
+// 3-second timeout is intentionally tight — the settings page should respond quickly.
+builder.Services.AddHttpClient("settings_probe", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(5); // outer cap; each probe uses a 3-second CTS
+});
+
 builder.Services.AddHttpClient("apple_books", c =>
 {
     c.Timeout = TimeSpan.FromSeconds(10);
@@ -187,5 +214,6 @@ app.MapHubEndpoints();
 app.MapStreamEndpoints();
 app.MapIngestionEndpoints();
 app.MapMetadataEndpoints();
+app.MapSettingsEndpoints();
 
 app.Run();

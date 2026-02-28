@@ -40,4 +40,18 @@ public interface ITanasteApiClient
 
     /// <summary>DELETE /admin/api-keys/{id} — revoke a key immediately.</summary>
     Task<bool> RevokeApiKeyAsync(Guid id, CancellationToken ct = default);
+
+    // ── Settings (/settings) ──────────────────────────────────────────────────
+
+    /// <summary>GET /settings/folders — current Watch Folder + Library Folder paths.</summary>
+    Task<FolderSettingsDto?> GetFolderSettingsAsync(CancellationToken ct = default);
+
+    /// <summary>PUT /settings/folders — save paths to manifest and hot-swap the FileSystemWatcher.</summary>
+    Task<bool> UpdateFolderSettingsAsync(FolderSettingsDto settings, CancellationToken ct = default);
+
+    /// <summary>POST /settings/test-path — probe a directory for existence, read, and write access.</summary>
+    Task<PathTestResultDto?> TestPathAsync(string path, CancellationToken ct = default);
+
+    /// <summary>GET /settings/providers — enabled state and live reachability for all providers.</summary>
+    Task<IReadOnlyList<ProviderStatusDto>> GetProviderStatusAsync(CancellationToken ct = default);
 }

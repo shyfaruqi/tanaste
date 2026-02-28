@@ -16,11 +16,12 @@ namespace Tanaste.Web.Services.Integration;
 /// </summary>
 public sealed class UniverseStateContainer
 {
-    private List<HubViewModel>      _hubs              = [];
-    private HubViewModel?           _selected;
-    private UniverseViewModel?      _universe;
-    private bool                    _loaded;
-    private IngestionProgressEvent? _ingestionProgress;
+    private List<HubViewModel>         _hubs                       = [];
+    private HubViewModel?              _selected;
+    private UniverseViewModel?         _universe;
+    private bool                       _loaded;
+    private IngestionProgressEvent?    _ingestionProgress;
+    private WatchFolderActiveEvent?    _latestWatchFolderActivation;
     private readonly List<PersonEnrichedEvent> _personUpdates = [];
 
     // ── Read-only surface ─────────────────────────────────────────────────────
@@ -41,8 +42,14 @@ public sealed class UniverseStateContainer
     /// Latest ingestion progress snapshot pushed via SignalR.
     /// Null when no ingestion is in progress or the circuit is freshly created.
     /// </summary>
-    public IngestionProgressEvent?     IngestionProgress => _ingestionProgress;
-    public IReadOnlyList<PersonEnrichedEvent> RecentPersonUpdates => _personUpdates;
+    public IngestionProgressEvent?          IngestionProgress           => _ingestionProgress;
+    public IReadOnlyList<PersonEnrichedEvent> RecentPersonUpdates        => _personUpdates;
+
+    /// <summary>
+    /// The most recent <c>"WatchFolderActive"</c> event received via SignalR.
+    /// Null until the watch folder has been configured or changed in the current circuit.
+    /// </summary>
+    public WatchFolderActiveEvent?          LatestWatchFolderActivation => _latestWatchFolderActivation;
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -116,6 +123,17 @@ public sealed class UniverseStateContainer
         // Keep only the 50 most recent person updates to avoid unbounded growth.
         if (_personUpdates.Count > 50)
             _personUpdates.RemoveAt(0);
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Called when a <c>"WatchFolderActive"</c> event arrives on the Intercom hub.
+    /// Updates <see cref="LatestWatchFolderActivation"/> so components can react
+    /// to a watch folder change without a page reload.
+    /// </summary>
+    public void PushWatchFolderActive(WatchFolderActiveEvent ev)
+    {
+        _latestWatchFolderActivation = ev;
         OnStateChanged?.Invoke();
     }
 }

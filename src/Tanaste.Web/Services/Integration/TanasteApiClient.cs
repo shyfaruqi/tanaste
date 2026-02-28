@@ -160,6 +160,55 @@ public sealed class TanasteApiClient : ITanasteApiClient
         catch { return false; }
     }
 
+    // ── /settings ─────────────────────────────────────────────────────────────
+
+    public async Task<FolderSettingsDto?> GetFolderSettingsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<FolderSettingsDto>("/settings/folders", ct);
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> UpdateFolderSettingsAsync(
+        FolderSettingsDto settings,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var body = new { watch_directory = settings.WatchDirectory, library_root = settings.LibraryRoot };
+            var resp = await _http.PutAsJsonAsync("/settings/folders", body, ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<PathTestResultDto?> TestPathAsync(
+        string            path,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var body = new { path };
+            var resp = await _http.PostAsJsonAsync("/settings/test-path", body, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            return await resp.Content.ReadFromJsonAsync<PathTestResultDto>(ct);
+        }
+        catch { return null; }
+    }
+
+    public async Task<IReadOnlyList<ProviderStatusDto>> GetProviderStatusAsync(
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var raw = await _http.GetFromJsonAsync<ProviderStatusDto[]>("/settings/providers", ct);
+            return raw ?? [];
+        }
+        catch { return []; }
+    }
+
     // ── Private mapping ───────────────────────────────────────────────────────
 
     private static HubViewModel MapHub(HubRaw h) => HubViewModel.FromApiDto(
