@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Tanaste.Domain.Enums;
 using Tanaste.Ingestion.Contracts;
 using Tanaste.Ingestion.Models;
 
@@ -168,6 +169,11 @@ public sealed class FileOrganizer : IFileOrganizer
             ["Extension"] = Path.GetExtension(candidate.Path).TrimStart('.'),
             ["Series"]    = meta.GetValueOrDefault("series",    "Unknown"),
             ["Publisher"] = meta.GetValueOrDefault("publisher", "Unknown"),
+            // ── Phase 7: Hub-First template tokens ───────────────────────────────
+            ["Category"]  = ResolveCategoryFromMediaType(candidate.DetectedMediaType),
+            ["HubName"]   = meta.GetValueOrDefault("title",   "Unknown"),
+            ["Format"]    = candidate.DetectedMediaType?.ToString() ?? "Unknown",
+            ["Edition"]   = meta.GetValueOrDefault("edition", "Standard"),
         };
 
         // Merge caller-supplied extras (allow overriding built-ins).
@@ -203,6 +209,19 @@ public sealed class FileOrganizer : IFileOrganizer
         string result = System.Text.RegularExpressions.Regex.Replace(sb.ToString(), @"\s{2,}", " ").Trim();
         return string.IsNullOrEmpty(result) ? "Unknown" : result;
     }
+
+    /// <summary>
+    /// Maps a <see cref="MediaType"/> to a broad human-readable category
+    /// used as the top-level directory in the Hub-first organisation template.
+    /// </summary>
+    private static string ResolveCategoryFromMediaType(MediaType? mt) => mt switch
+    {
+        MediaType.Epub      => "Books",
+        MediaType.Comic     => "Comics",
+        MediaType.Movie     => "Videos",
+        MediaType.Audiobook => "Audio",
+        _                   => "Other",
+    };
 
     /// <summary>
     /// If <paramref name="path"/> does not exist, returns it unchanged.

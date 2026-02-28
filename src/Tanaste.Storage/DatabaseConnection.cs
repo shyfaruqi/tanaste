@@ -134,6 +134,15 @@ public sealed class DatabaseConnection : IDatabaseConnection
                 CREATE INDEX IF NOT EXISTS idx_person_media_links_asset
                     ON person_media_links (media_asset_id);
                 """);
+
+        // Migration M-004: Phase 7 - add display_name to hubs.
+        // Databases created before Phase 7 will not have this column; the ALTER
+        // TABLE adds it as nullable so all existing rows are treated as unnamed.
+        MigrateAddColumnIfMissing(
+            conn,
+            table:  "hubs",
+            column: "display_name",
+            ddl:    "ALTER TABLE hubs ADD COLUMN display_name TEXT;");
     }
 
     // -------------------------------------------------------------------------

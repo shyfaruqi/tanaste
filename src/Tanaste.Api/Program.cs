@@ -193,6 +193,10 @@ builder.Services.AddSingleton<IExternalMetadataProvider, WikidataAdapter>();
 builder.Services.AddSingleton<IMetadataHarvestingService, MetadataHarvestingService>();
 builder.Services.AddSingleton<IRecursiveIdentityService,  RecursiveIdentityService>();
 
+// ── Phase 7: Sidecar writer + Great Inhale scanner ───────────────────────────
+builder.Services.AddSingleton<ISidecarWriter,  SidecarWriter>();
+builder.Services.AddSingleton<ILibraryScanner, LibraryScanner>();
+
 // ── Build ─────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 

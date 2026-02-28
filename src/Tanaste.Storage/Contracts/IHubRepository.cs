@@ -5,7 +5,6 @@ namespace Tanaste.Storage.Contracts;
 /// <summary>
 /// Persistence contract for loading <see cref="Hub"/> aggregates with their
 /// child Works and associated CanonicalValues.
-/// Used exclusively by GET /hubs in Tanaste.Api.
 /// </summary>
 public interface IHubRepository
 {
@@ -15,4 +14,18 @@ public interface IHubRepository
     /// by the list endpoint; add a FindByIdAsync overload later if required).
     /// </summary>
     Task<IReadOnlyList<Hub>> GetAllAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Finds a hub by its display name (case-insensitive).
+    /// Returns null when no hub with that name exists.
+    /// Used by Great Inhale to avoid creating duplicate hubs.
+    /// </summary>
+    Task<Hub?> FindByDisplayNameAsync(string displayName, CancellationToken ct = default);
+
+    /// <summary>
+    /// Inserts a new Hub (identified by <see cref="Hub.Id"/>) if it does not
+    /// yet exist, or updates <see cref="Hub.DisplayName"/> on an existing one.
+    /// Returns the hub's <see cref="Hub.Id"/>.
+    /// </summary>
+    Task<Guid> UpsertAsync(Hub hub, CancellationToken ct = default);
 }

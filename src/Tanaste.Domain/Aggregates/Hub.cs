@@ -31,6 +31,14 @@ public sealed class Hub
     /// </summary>
     public Guid? UniverseId { get; set; }
 
+    /// <summary>
+    /// Human-readable name for display in the Dashboard and folder structure.
+    /// Set from the title canonical value at organization time, or from the
+    /// tanaste.xml sidecar during Great Inhale.
+    /// Null on hubs created before Phase 7.
+    /// </summary>
+    public string? DisplayName { get; set; }
+
     /// <summary>When this Hub was first registered in the system.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 

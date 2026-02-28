@@ -260,6 +260,62 @@ When a file's metadata contains an author or narrator name, the Engine:
 - **Maintenance** — Adding a new provider is one new class implementing `IExternalMetadataProvider` plus one JSON entry. No existing code changes.
 - **Privacy** — Only titles, authors, and ASINs are sent to external services — no personal data, no usage telemetry, no library structure.
 
+### 3.7 — Library Organization & Sidecar System (Filesystem-First)
+
+**Plain English:** After a file is ingested and scored with sufficient confidence, Tanaste organises it into a clean, human-readable folder structure and writes an XML companion file alongside it. This XML file is the portable source of truth: if the database is ever wiped, the library can be rebuilt from it in seconds.
+
+**Filesystem-First design invariant:**
+- The **database is a cache of the filesystem, not the master copy.** XML always wins on conflict during a Great Inhale.
+- Cover art is **never stored in the database.** `cover.jpg` lives alongside the file on disk and is always read from there.
+
+**Hub-First Folder Structure:**
+```
+{LibraryRoot}/{Category}/{HubName} ({Year})/{Format} - {Edition}/
+  {filename}.epub          ← the organised media file
+  tanaste.xml              ← Edition-level sidecar (this folder)
+  cover.jpg                ← Cover art extracted from the file
+{LibraryRoot}/{Category}/{HubName} ({Year})/
+  tanaste.xml              ← Hub-level sidecar (parent folder)
+```
+
+`{Category}` is derived from `MediaType` enum: `Books` (Epub), `Comics`, `Videos` (Movie), `Audio` (Audiobook), `Other`.
+
+**AutoOrganize confidence gate:**
+AutoOrganize is gated on:
+```
+scored.OverallConfidence >= 0.85  ||  claims.Any(c => c.IsUserLocked)
+```
+Files that score below 0.85 with no user locks are left in the Watch Folder and not moved — they wait for more data. The threshold reuses `AutoLinkThreshold = 0.85` from `ScoringConfiguration` (single source of truth).
+
+**tanaste.xml schemas:**
+- `<tanaste-hub version="1.0">` — `identity/display-name`, `identity/year`, `identity/wikidata-qid`, `identity/franchise`, `last-organized`.
+- `<tanaste-edition version="1.0">` — `identity/title`, `identity/author`, `identity/media-type`, `identity/isbn`, `identity/asin`, `content-hash`, `cover-path`, `user-locks` (zero or more `<claim key=".." value=".." locked-at=".."/>`), `last-organized`.
+
+**Key types and services:**
+- `ISidecarWriter` / `SidecarWriter` (`Tanaste.Ingestion`) — reads and writes both XML schemas using `System.Xml.Linq` (BCL — no new NuGet dependency). `WriteHubSidecarAsync(hubFolderPath, data)`, `WriteEditionSidecarAsync(editionFolderPath, data)`, `ReadHubSidecarAsync(xmlPath)`, `ReadEditionSidecarAsync(xmlPath)`. Both read methods return `null` on any exception (resilient).
+- `ILibraryScanner` / `LibraryScanner` (`Tanaste.Ingestion`) — Great Inhale implementation. Recursively enumerates `tanaste.xml` files; peeks root element name via `XmlReader` (fast, no full load); dispatches to `HydrateHubAsync` or `HydrateEditionAsync`. Stable provider GUID `c9d8e7f6-a5b4-4321-fedc-0102030405c9` for re-inserted user-locked claims.
+- `LibraryScanResult` (`Tanaste.Ingestion.Models`) — scan outcome counts: `HubsUpserted`, `EditionsUpserted`, `Errors`, `Elapsed`.
+- `HubSidecarData`, `EditionSidecarData`, `UserLockedClaim` (`Tanaste.Ingestion.Models`) — POCOs for XML data exchange between `SidecarWriter` and `LibraryScanner`.
+- `IHubRepository.FindByDisplayNameAsync` + `IHubRepository.UpsertAsync` — added to support Hub hydration in Great Inhale.
+- `Hub.DisplayName` (`Tanaste.Domain.Aggregates`) — human-readable hub name; populated at organise time and restored from XML.
+- Migration **M-004** — `ALTER TABLE hubs ADD COLUMN display_name TEXT;` — applied in `DatabaseConnection.RunStartupChecks()`.
+
+**API endpoint:**
+- `POST /ingestion/library-scan` — triggers Great Inhale. Returns `LibraryScanResponse` with hub/edition counts and elapsed time. Requires `LibraryRoot` to be configured; returns 400 if unset or if the directory does not exist.
+- Dashboard client method: `TriggerLibraryScanAsync()` on `ITanasteApiClient` / `TanasteApiClient`.
+
+**wikidata_qid canonical key:**
+`wikidata_qid` is used as a Work-level canonical value key (produced by the Wikidata adapter in Phase 9). It is written into the Hub-level tanaste.xml as `<identity/wikidata-qid>` for portability.
+
+**Great Inhale scope constraints:**
+Edition-level hydration **requires the MediaAsset to already exist in the database** (matched by content hash). It cannot create a `Hub → Work → Edition → MediaAsset` chain from scratch after a complete wipe — that requires a full re-ingestion pass (no `IWorkRepository` or `IEditionRepository` exist yet). Hub-level hydration creates Hub records unconditionally.
+
+**Why this matters to the business:**
+- **Reliability** — A complete database wipe is recoverable. Drop the database file; run Great Inhale; the library is back.
+- **Maintenance** — The XML schema is human-readable. A user can open `tanaste.xml` in any text editor and understand exactly what Tanaste knows about a file.
+- **Privacy** — All data lives on disk under the Library Root. No external dependency, no cloud sync.
+- **Performance** — Great Inhale reads XML only (no file hashing, no metadata extraction). A library of thousands of files scans in seconds.
+
 ---
 
 ## 4. Product Owner Communication Rules

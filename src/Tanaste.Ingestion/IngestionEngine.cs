@@ -66,6 +66,9 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
     private readonly IMetadataHarvestingService  _harvesting;
     private readonly IRecursiveIdentityService   _identity;
 
+    // Phase 7: sidecar XML writer.
+    private readonly ISidecarWriter _sidecar;
+
     public IngestionEngine(
         IFileWatcher              watcher,
         DebounceQueue             debounce,
@@ -82,7 +85,8 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
         IMetadataClaimRepository   claimRepo,
         ICanonicalValueRepository  canonicalRepo,
         IMetadataHarvestingService harvesting,
-        IRecursiveIdentityService  identity)
+        IRecursiveIdentityService  identity,
+        ISidecarWriter             sidecar)
     {
         _watcher       = watcher;
         _debounce      = debounce;
@@ -100,6 +104,7 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
         _canonicalRepo = canonicalRepo;
         _harvesting    = harvesting;
         _identity      = identity;
+        _sidecar       = sidecar;
     }
 
     // =========================================================================
@@ -329,16 +334,70 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
             await _identity.EnrichAsync(assetId, persons, ct).ConfigureAwait(false);
 
         // Step 11: auto-organize.
+        // Gate: only organize when we have high-confidence metadata or an explicit
+        // user-locked claim. This prevents poorly-tagged files from being committed
+        // to the library structure before enough information is available.
+        bool hasUserLock    = claims.Any(c => c.IsUserLocked);
+        bool highConfidence = scored.OverallConfidence >= 0.85;
+
         string currentPath = candidate.Path;
-        if (_options.AutoOrganize && !string.IsNullOrWhiteSpace(_options.LibraryRoot))
+        if (_options.AutoOrganize
+            && !string.IsNullOrWhiteSpace(_options.LibraryRoot)
+            && (highConfidence || hasUserLock))
         {
-            var relative   = _organizer.CalculatePath(candidate, _options.OrganizationTemplate);
-            var destPath   = Path.Combine(_options.LibraryRoot, relative,
-                                           Path.GetFileName(candidate.Path));
+            var relative = _organizer.CalculatePath(candidate, _options.OrganizationTemplate);
+            var destPath = Path.Combine(_options.LibraryRoot, relative,
+                                         Path.GetFileName(candidate.Path));
 
             bool moved = await _organizer.ExecuteMoveAsync(currentPath, destPath, ct)
                                           .ConfigureAwait(false);
             if (moved) currentPath = destPath;
+        }
+
+        // Step 11b: write sidecar XML and persist cover art.
+        // Only runs when AutoOrganize triggered (same confidence/lock gate) so
+        // the sidecar is always co-located with the organized file.
+        if (_options.AutoOrganize
+            && !string.IsNullOrWhiteSpace(_options.LibraryRoot)
+            && (highConfidence || hasUserLock))
+        {
+            string editionFolder = Path.GetDirectoryName(currentPath) ?? string.Empty;
+            string hubFolder     = Path.GetDirectoryName(editionFolder) ?? string.Empty;
+            var    meta          = candidate.Metadata
+                                   ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            // Edition-level sidecar — records file identity, user locks, cover path.
+            await _sidecar.WriteEditionSidecarAsync(editionFolder, new EditionSidecarData
+            {
+                Title         = meta.GetValueOrDefault("title"),
+                Author        = meta.GetValueOrDefault("author"),
+                MediaType     = candidate.DetectedMediaType?.ToString(),
+                Isbn          = meta.GetValueOrDefault("isbn"),
+                Asin          = meta.GetValueOrDefault("asin"),
+                ContentHash   = hash.Hex,
+                CoverPath     = "cover.jpg",
+                UserLocks     = [],           // empty on first ingest; re-written on resolve
+                LastOrganized = DateTimeOffset.UtcNow,
+            }, ct).ConfigureAwait(false);
+
+            // Hub-level sidecar — records work identity (idempotent; last ingest wins).
+            await _sidecar.WriteHubSidecarAsync(hubFolder, new HubSidecarData
+            {
+                DisplayName   = meta.GetValueOrDefault("title", "Unknown"),
+                Year          = meta.GetValueOrDefault("year"),
+                WikidataQid   = meta.GetValueOrDefault("wikidata_qid"),
+                Franchise     = meta.GetValueOrDefault("franchise"),
+                LastOrganized = DateTimeOffset.UtcNow,
+            }, ct).ConfigureAwait(false);
+
+            // Persist cover art as cover.jpg alongside the Edition sidecar.
+            // Cover images are NEVER stored in the database — always read from disk.
+            if (result.CoverImage is { Length: > 0 })
+            {
+                await File.WriteAllBytesAsync(
+                    Path.Combine(editionFolder, "cover.jpg"),
+                    result.CoverImage, ct).ConfigureAwait(false);
+            }
         }
 
         // Step 12: write-back.

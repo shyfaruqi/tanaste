@@ -35,7 +35,7 @@ public sealed class HubRepository : IHubRepository
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = """
-                SELECT h.id, h.universe_id, h.created_at,
+                SELECT h.id, h.universe_id, h.display_name, h.created_at,
                        w.id, w.media_type, w.sequence_index
                 FROM   hubs h
                 LEFT JOIN works w ON w.hub_id = h.id
@@ -50,25 +50,26 @@ public sealed class HubRepository : IHubRepository
                 {
                     hub = new Hub
                     {
-                        Id         = hubId,
-                        UniverseId = reader.IsDBNull(1) ? null : Guid.Parse(reader.GetString(1)),
-                        CreatedAt  = DateTimeOffset.Parse(reader.GetString(2)),
+                        Id          = hubId,
+                        UniverseId  = reader.IsDBNull(1) ? null : Guid.Parse(reader.GetString(1)),
+                        DisplayName = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        CreatedAt   = DateTimeOffset.Parse(reader.GetString(3)),
                     };
                     hubs[hubId] = hub;
                 }
 
                 // LEFT JOIN: work columns are NULL when the hub has no works.
-                if (!reader.IsDBNull(3))
+                if (!reader.IsDBNull(4))
                 {
-                    var workId = Guid.Parse(reader.GetString(3));
+                    var workId = Guid.Parse(reader.GetString(4));
                     if (!works.ContainsKey(workId))
                     {
                         var work = new Work
                         {
                             Id            = workId,
                             HubId         = hubId,
-                            MediaType     = Enum.Parse<MediaType>(reader.GetString(4), ignoreCase: true),
-                            SequenceIndex = reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                            MediaType     = Enum.Parse<MediaType>(reader.GetString(5), ignoreCase: true),
+                            SequenceIndex = reader.IsDBNull(6) ? null : reader.GetInt32(6),
                         };
                         works[workId] = work;
                         hub.Works.Add(work);
@@ -112,5 +113,61 @@ public sealed class HubRepository : IHubRepository
 
         IReadOnlyList<Hub> result = hubs.Values.ToList();
         return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
+    public Task<Hub?> FindByDisplayNameAsync(string displayName, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var conn = _db.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, universe_id, display_name, created_at
+            FROM   hubs
+            WHERE  LOWER(display_name) = LOWER(@name)
+            LIMIT  1;
+            """;
+        cmd.Parameters.AddWithValue("@name", displayName);
+
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read())
+            return Task.FromResult<Hub?>(null);
+
+        var hub = new Hub
+        {
+            Id          = Guid.Parse(reader.GetString(0)),
+            UniverseId  = reader.IsDBNull(1) ? null : Guid.Parse(reader.GetString(1)),
+            DisplayName = reader.IsDBNull(2) ? null : reader.GetString(2),
+            CreatedAt   = DateTimeOffset.Parse(reader.GetString(3)),
+        };
+
+        return Task.FromResult<Hub?>(hub);
+    }
+
+    /// <inheritdoc/>
+    public Task<Guid> UpsertAsync(Hub hub, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var conn = _db.Open();
+
+        // INSERT OR IGNORE ensures idempotency for new hubs.
+        // UPDATE sets display_name on every call so the latest ingested name wins.
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT OR IGNORE INTO hubs(id, universe_id, display_name, created_at)
+                VALUES (@id, @uid, @dn, @ca);
+            UPDATE hubs SET display_name = @dn WHERE id = @id;
+            """;
+        cmd.Parameters.AddWithValue("@id",  hub.Id.ToString());
+        cmd.Parameters.AddWithValue("@uid", hub.UniverseId.HasValue
+            ? hub.UniverseId.Value.ToString()
+            : (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("@dn",  hub.DisplayName ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("@ca",  hub.CreatedAt.ToString("O"));
+        cmd.ExecuteNonQuery();
+
+        return Task.FromResult(hub.Id);
     }
 }

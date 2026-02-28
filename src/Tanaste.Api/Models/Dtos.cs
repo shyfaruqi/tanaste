@@ -239,6 +239,27 @@ public sealed class PendingOperationDto
     };
 }
 
+// ── POST /ingestion/library-scan ───────────────────────────────────────────────
+
+public sealed class LibraryScanResponse
+{
+    /// <summary>Number of Hub records created or updated in the database.</summary>
+    [JsonPropertyName("hubs_upserted")]
+    public int HubsUpserted { get; init; }
+
+    /// <summary>Number of Edition/MediaAsset canonical value sets upserted.</summary>
+    [JsonPropertyName("editions_upserted")]
+    public int EditionsUpserted { get; init; }
+
+    /// <summary>Number of sidecar files that could not be parsed or hydrated.</summary>
+    [JsonPropertyName("errors")]
+    public int Errors { get; init; }
+
+    /// <summary>Wall-clock time taken for the full scan, in milliseconds.</summary>
+    [JsonPropertyName("elapsed_ms")]
+    public long ElapsedMs { get; init; }
+}
+
 // ── PATCH /metadata/resolve ────────────────────────────────────────────────────
 
 public sealed class ResolveRequest

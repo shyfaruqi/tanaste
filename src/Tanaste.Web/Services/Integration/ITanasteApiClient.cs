@@ -18,6 +18,13 @@ public interface ITanasteApiClient
     /// <summary>POST /ingestion/scan — dry-run scan of a directory path.</summary>
     Task<ScanResultViewModel?> TriggerScanAsync(string? rootPath = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// POST /ingestion/library-scan — Great Inhale: reads tanaste.xml sidecars in the
+    /// Library Root and hydrates the database. XML always wins on conflict.
+    /// Returns null on failure.
+    /// </summary>
+    Task<LibraryScanResultViewModel?> TriggerLibraryScanAsync(CancellationToken ct = default);
+
     /// <summary>PATCH /metadata/resolve — manually override a metadata canonical value.</summary>
     Task<bool> ResolveMetadataAsync(
         Guid   entityId,

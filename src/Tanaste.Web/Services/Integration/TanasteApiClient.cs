@@ -70,6 +70,20 @@ public sealed class TanasteApiClient : ITanasteApiClient
         catch { return null; }
     }
 
+    // ── POST /ingestion/library-scan ─────────────────────────────────────────
+
+    public async Task<LibraryScanResultViewModel?> TriggerLibraryScanAsync(
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync("/ingestion/library-scan", new { }, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            return await resp.Content.ReadFromJsonAsync<LibraryScanResultViewModel>(ct);
+        }
+        catch { return null; }
+    }
+
     // ── PATCH /metadata/resolve ───────────────────────────────────────────────
 
     public async Task<bool> ResolveMetadataAsync(

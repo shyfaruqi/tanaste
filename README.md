@@ -190,6 +190,50 @@ Tanaste.Domain          ← Business rules and data shapes (zero dependencies)
 
 ---
 
+## 🗂️ Filesystem-First Philosophy
+
+**The database is a cache of the filesystem, not the other way around.**
+
+Every file that Tanaste organises carries its own self-describing manifest — a `tanaste.xml` sidecar written directly alongside it on disk. If the database is ever wiped or migrated, the library can be fully reconstructed from those XML files alone. Nothing is ever lost that cannot be recovered from disk.
+
+### Hub-First Folder Structure
+
+When AutoOrganize is enabled and a file scores above the confidence threshold (≥ 0.85) or has a user-locked metadata value, Tanaste moves it into a clean, human-readable hierarchy:
+
+```
+{Library Root}/
+  Books/
+    The Hobbit (1937)/
+      tanaste.xml                    ← Hub sidecar — human-readable identity + metadata
+      Epub - Standard/
+        The Hobbit.epub
+        tanaste.xml                  ← Edition sidecar — content hash, title, author, locks
+        cover.jpg                    ← Cover art (always on disk, never stored in DB)
+```
+
+The top-level category (`Books`, `Comics`, `Videos`, `Audio`) is derived from the file's detected media type. The Hub name is the scored title canonical value. The format folder identifies the media type and edition. The file is then placed inside, alongside its XML sidecar and cover image.
+
+### The tanaste.xml Sidecar
+
+Each sidecar is a small XML file with two schemas:
+
+- **Hub-level** (`<tanaste-hub>`) — stores the Hub's display name, year, Wikidata identifier, and franchise. Written once per Hub folder; idempotent on repeat ingestion of the same Hub.
+- **Edition-level** (`<tanaste-edition>`) — stores all metadata canonical values (title, author, media type, ISBN, ASIN), the content hash (permanent file identity), the cover-art path, and a list of any user-locked claims with their lock timestamps.
+
+### The Great Inhale — Rebuilding from Disk
+
+If the database is deleted or corrupted, call `POST /ingestion/library-scan` from the Engine API (or via the Dashboard). Tanaste will:
+
+1. Recursively walk every folder under the Library Root looking for `tanaste.xml` files.
+2. For each **Hub sidecar**: create or update the corresponding Hub record. XML always wins on conflict.
+3. For each **Edition sidecar**: find the existing MediaAsset by its content hash, then restore all canonical values and any user-locked claims. Files not yet present in the database are skipped — a normal ingestion pass is needed to create them.
+
+The Great Inhale is a **read-only XML scan** — it reads XML only, performs no file hashing and no metadata extraction, and completes in seconds even for large libraries.
+
+> **The design constraint:** Cover art is never stored in the database. `cover.jpg` is always read from disk. The `tanaste.xml` sidecar is the single portable source of truth.
+
+---
+
 ## 🌐 Supported Metadata Providers
 
 Tanaste ships with three built-in zero-key providers — no API accounts, no rate-limit quotas, no cost. They activate automatically after you enable them in `tanaste_master.json`.
@@ -250,6 +294,7 @@ External apps can query Hubs, trigger library scans, and resolve metadata confli
 | **Phase 7** | Ingestion Engine — Watch Folder, debounce queue, content hasher, background worker |
 | **Phase 8** | Field-Level Arbitration — User-Locked Claims, per-field provider trust matrix |
 | **Phase 9** | External Metadata Adapters — Apple Books, Audnexus, Wikidata; Recursive Person Enrichment |
+| **Library Organization & Sidecar System** | Hub-first folder structure (`{Category}/{Hub} ({Year})/{Format} - {Edition}`); tanaste.xml sidecars at Hub and Edition level; confidence gate on AutoOrganize (≥0.85 or user-locked); Great Inhale (`POST /ingestion/library-scan`) to rebuild DB from XML |
 | **UI Deliverable 1** | Dashboard shell — MudBlazor layout, dark mode, Bento Grid, Hub cards, Command Palette |
 | **UI Deliverable 2** | State & real-time — UniverseViewModel, UniverseMapper, SignalR Intercom listener |
 

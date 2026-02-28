@@ -43,6 +43,39 @@ public static class IngestionEndpoints
         .Produces<ScanResponse>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status400BadRequest);
 
+        // ── POST /ingestion/library-scan ──────────────────────────────────────────
+
+        group.MapPost("/library-scan", async (
+            ILibraryScanner            scanner,
+            IOptions<IngestionOptions> opts,
+            CancellationToken          ct) =>
+        {
+            var root = opts.Value.LibraryRoot;
+
+            if (string.IsNullOrWhiteSpace(root))
+                return Results.BadRequest(
+                    "LibraryRoot is not configured. Set Ingestion:LibraryRoot in appsettings.json.");
+
+            if (!Directory.Exists(root))
+                return Results.BadRequest($"Library root does not exist: {root}");
+
+            var result = await scanner.ScanAsync(root, ct);
+
+            return Results.Ok(new LibraryScanResponse
+            {
+                HubsUpserted     = result.HubsUpserted,
+                EditionsUpserted = result.EditionsUpserted,
+                Errors           = result.Errors,
+                ElapsedMs        = (long)result.Elapsed.TotalMilliseconds,
+            });
+        })
+        .WithName("TriggerLibraryScan")
+        .WithSummary(
+            "Reads tanaste.xml sidecars in the Library Root and hydrates the database. " +
+            "XML always wins on conflict (Great Inhale).")
+        .Produces<LibraryScanResponse>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
+
         return app;
     }
 }
