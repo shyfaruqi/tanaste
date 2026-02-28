@@ -20,7 +20,7 @@
                        title="Toggle navigation" />
 
         <MudLink Href="/" Underline="Underline.None" Class="ml-2 d-flex align-center">
-            <img src="images/tanaste-logo.svg" alt="Tanaste" style="height: 34px; display: block;" />
+            <img src="images/tanaste-logo.svg" alt="Tanaste" class="tanaste-logo" style="height: 34px; display: block;" />
         </MudLink>
 
         <MudSpacer />
@@ -72,6 +72,8 @@
         {
             // Register Ctrl+K to open the Command Palette.
             await JS.InvokeVoidAsync("registerCtrlK", DotNetObjectReference.Create(this));
+            // Seed the body class so logos render correctly before any toggle.
+            await JS.InvokeVoidAsync("setThemeClass", _isDark);
         }
     }
 
@@ -80,10 +82,11 @@
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
-    private void ToggleTheme()
+    private async Task ToggleTheme()
     {
         ThemeService.ToggleTheme();
         _isDark = ThemeService.IsDarkMode;
+        await JS.InvokeVoidAsync("setThemeClass", _isDark);
     }
 
     private void OnThemeUpdated()
