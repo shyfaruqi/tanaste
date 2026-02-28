@@ -78,6 +78,27 @@ public static class UniverseMapper
     /// <summary>Returns the brand hex colour for a given <see cref="MediaTypeBucket"/>.</summary>
     public static string ColourFor(MediaTypeBucket bucket) => BucketColours[bucket];
 
+    /// <summary>
+    /// Returns the brand hex colour that best represents the dominant media type
+    /// across a Hub's work list.  Used by <see cref="HubViewModel.DominantHexColor"/>
+    /// to colour the Hub's bento tile without a full universe map pass.
+    /// </summary>
+    public static string ColourForHub(IEnumerable<WorkViewModel> works)
+    {
+        var buckets = works.Select(w => ClassifyBucket(w.MediaType)).ToList();
+
+        if (buckets.Count == 0)
+            return BucketColours[MediaTypeBucket.Unknown];
+
+        var top = buckets
+            .GroupBy(b => b)
+            .OrderByDescending(g => g.Count())
+            .First()
+            .Key;
+
+        return BucketColours[top];
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /// <summary>

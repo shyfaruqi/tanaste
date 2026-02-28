@@ -1,6 +1,8 @@
 @namespace Tanaste.Web.Components.Universe
 
-@* Asymmetric Bento grid of Universe/Hub cards (Section 2.2 of the UI ASD). *@
+@* Asymmetric Bento grid of Hub cards (Section 2.2 of the UI ASD).
+   The first (newest) Hub is the hero tile at 2×2; all others are 1×1.
+   Each BentoItem glows with its Hub's brand colour.                    *@
 
 @if (Hubs is { Count: > 0 })
 {
@@ -9,33 +11,40 @@
     <BentoGrid Class="@Class">
         @foreach (var (hub, index) in Hubs.Select((h, i) => (h, i)))
         {
-            @* Alternate between wide (2-col) and narrow (1-col) for bento asymmetry *@
-            <BentoItem ColSpan="@(index % 3 == 0 ? 2 : 1)">
-                <MudCard Class="universe-card mud-elevation-2 h-100"
-                         Style="height: 100%; cursor: pointer;">
-                    <MudCardContent Class="pa-4 d-flex flex-column justify-space-between h-100">
-                        <div>
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2" Spacing="2">
-                                <MudIcon Icon="@GetMediaIcon(hub.MediaTypes)"
-                                         Color="Color.Primary"
-                                         Size="Size.Small" />
-                                <MudText Typo="Typo.overline" Color="Color.Primary">
-                                    @hub.MediaTypes
-                                </MudText>
-                            </MudStack>
+            var isHero = index == 0;
 
-                            <MudText Typo="Typo.h6" Class="mb-1">@hub.DisplayName</MudText>
+            <BentoItem ColSpan="@(isHero ? 2 : 1)"
+                       RowSpan="@(isHero ? 2 : 1)"
+                       GlowColor="@hub.DominantHexColor">
 
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                @hub.WorkCount @(hub.WorkCount == 1 ? "work" : "works")
-                            </MudText>
-                        </div>
+                <div class="bento-hub-content" @onclick="() => OnHubSelected.InvokeAsync(hub)">
 
-                        <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-3">
-                            Added @hub.CreatedAt.LocalDateTime.ToString("MMM d, yyyy")
+                    @* ── Type badge row ── *@
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-2">
+                        <MudIcon Icon="@GetMediaIcon(hub.MediaTypes)"
+                                 Style="@($"color: {hub.DominantHexColor}; font-size: 16px;")" />
+                        <MudText Typo="Typo.overline"
+                                 Style="@($"color: {hub.DominantHexColor}; letter-spacing: 0.1em;")">
+                            @hub.MediaTypes
                         </MudText>
-                    </MudCardContent>
-                </MudCard>
+                    </MudStack>
+
+                    @* ── Title ── *@
+                    <MudText Typo="@(isHero ? Typo.h5 : Typo.h6)" Class="mb-1">
+                        @hub.DisplayName
+                    </MudText>
+
+                    @* ── Work count ── *@
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @hub.WorkCount @(hub.WorkCount == 1 ? "work" : "works")
+                    </MudText>
+
+                    @* ── Date — pushed to bottom *@
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-auto pt-3">
+                        Added @hub.CreatedAt.LocalDateTime.ToString("MMM d, yyyy")
+                    </MudText>
+
+                </div>
             </BentoItem>
         }
     </BentoGrid>
@@ -43,7 +52,8 @@
 else
 {
     <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0" Outlined="true">
-        <MudIcon Icon="@Icons.Material.Filled.LibraryAdd" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+        <MudIcon Icon="@Icons.Material.Filled.LibraryAdd"
+                 Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
         <MudText Typo="Typo.h6" Class="mb-2">Your library is empty</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
             Configure a watch directory and run a scan to populate your library.
@@ -52,8 +62,9 @@ else
 }
 
 @code {
-    [Parameter] public List<HubViewModel>? Hubs  { get; set; }
-    [Parameter] public string?             Class { get; set; }
+    [Parameter] public List<HubViewModel>?         Hubs          { get; set; }
+    [Parameter] public string?                     Class         { get; set; }
+    [Parameter] public EventCallback<HubViewModel> OnHubSelected { get; set; }
 
     private static string GetMediaIcon(string mediaTypes) => mediaTypes.ToLowerInvariant() switch
     {
@@ -65,15 +76,13 @@ else
 }
 
 <style>
-    .universe-card {
-        background: rgba(30, 30, 46, 0.70);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(8px);
-        transition: border-color 0.2s ease, transform 0.15s ease;
-    }
-
-    .universe-card:hover {
-        border-color: rgba(124, 77, 255, 0.50);
-        transform: translateY(-2px);
+    .bento-hub-content {
+        height:          100%;
+        min-height:      inherit;
+        padding:         1.25rem 1.5rem;
+        display:         flex;
+        flex-direction:  column;
+        cursor:          pointer;
+        user-select:     none;
     }
 </style>

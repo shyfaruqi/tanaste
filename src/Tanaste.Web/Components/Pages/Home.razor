@@ -1,5 +1,8 @@
 @page "/"
-@inject UIOrchestratorService Orchestrator
+@inject UIOrchestratorService  Orchestrator
+@inject ThemeService            ThemeService
+@inject UniverseStateContainer  State
+@implements IDisposable
 
 <PageTitle>Tanaste — Library</PageTitle>
 
@@ -16,21 +19,44 @@ else if (_error is not null)
 else
 {
     <HubHero Hub="@_heroHub" />
-    <UniverseStack Hubs="@_hubs" Class="mt-6" />
+    <UniverseStack Hubs="@_hubs" Class="mt-6" OnHubSelected="HandleHubSelected" />
 }
 
 @code {
-    private bool                _loading = true;
-    private string?             _error;
-    private HubViewModel?       _heroHub;
-    private List<HubViewModel>  _hubs = [];
+    private bool               _loading = true;
+    private string?            _error;
+    private HubViewModel?      _heroHub;
+    private List<HubViewModel> _hubs = [];
 
     protected override async Task OnInitializedAsync()
     {
+        // Subscribe before loading so no MediaAdded event is missed.
+        State.OnStateChanged += OnStateChanged;
+
+        // Start the SignalR Intercom channel (idempotent; non-fatal on failure).
+        await Orchestrator.StartSignalRAsync();
+
+        await LoadHubsAsync(showSpinner: true);
+    }
+
+    // ── Hub loading ───────────────────────────────────────────────────────────
+
+    private async Task LoadHubsAsync(bool showSpinner = true)
+    {
+        if (showSpinner)
+            _loading = true;
+
+        _error = null;
+
         try
         {
             _hubs    = await Orchestrator.GetHubsAsync();
             _heroHub = _hubs.FirstOrDefault();
+
+            // Prime the accent colour from the hero hub so the app bar and
+            // primary-coloured MudBlazor components match on first load.
+            if (_heroHub is not null)
+                ThemeService.SetHubAccent(_heroHub.DominantHexColor);
         }
         catch (Exception ex)
         {
@@ -40,5 +66,37 @@ else
         {
             _loading = false;
         }
+    }
+
+    // ── Hub selection ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called by <see cref="UniverseStack"/> when the user clicks a Hub tile.
+    /// Shifts the MudThemeProvider primary accent to that Hub's brand colour.
+    /// </summary>
+    private void HandleHubSelected(HubViewModel hub)
+    {
+        ThemeService.SetHubAccent(hub.DominantHexColor);
+    }
+
+    // ── SignalR live refresh ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Fired by <see cref="UniverseStateContainer"/> whenever a SignalR
+    /// <c>MediaAdded</c> event invalidates the hub cache.  Reloads without
+    /// showing the spinner to keep the transition seamless.
+    /// </summary>
+    private void OnStateChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadHubsAsync(showSpinner: false);
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        State.OnStateChanged -= OnStateChanged;
     }
 }

@@ -3,34 +3,62 @@ using MudBlazor;
 namespace Tanaste.Web.Services.Theming;
 
 /// <summary>
-/// Manages the active UI theme.  Singleton: the MudTheme object is shared;
-/// each circuit holds its own _isDark flag, synced via OnThemeChanged.
+/// Manages the active UI theme.  Singleton: the MudTheme object is shared across
+/// all circuits; each circuit holds its own <c>_isDark</c> flag, synced via
+/// <see cref="OnThemeChanged"/>.
+///
+/// <para>
+/// <b>Dynamic accent:</b> call <see cref="SetHubAccent"/> when the user selects a Hub.
+/// This rebuilds <see cref="Theme"/> with the Hub's brand colour as the primary
+/// accent and fires <see cref="OnThemeChanged"/> so every subscribed circuit re-renders.
+/// </para>
 /// </summary>
 public sealed class ThemeService
 {
+    private const string DefaultPrimary = "#7C4DFF"; // deep violet
+
     /// <summary>Default to Dark Mode as specified in Section 1.2 of the UI ASD.</summary>
     public bool IsDarkMode { get; private set; } = true;
 
     /// <summary>
-    /// The MudBlazor theme with Tanaste design tokens:
-    ///   • 24 px corner radii on all components
-    ///   • Deep-violet primary, teal secondary
-    ///   • Dark palette tuned for a cinema-style media browser
+    /// The active MudBlazor theme.  Rebuilt each time <see cref="SetHubAccent"/> is called;
+    /// <c>MainLayout</c> reads this property on every re-render triggered by <see cref="OnThemeChanged"/>.
     /// </summary>
-    public MudTheme Theme { get; } = BuildTheme();
+    public MudTheme Theme { get; private set; } = BuildTheme(DefaultPrimary);
 
-    /// <summary>Fired on every toggle so components can update their local _isDark field.</summary>
+    /// <summary>
+    /// Fired on dark/light toggle and on Hub accent changes so components can update
+    /// their local state.  May fire from a background thread — use
+    /// <c>InvokeAsync(StateHasChanged)</c> in component handlers.
+    /// </summary>
     public event Action? OnThemeChanged;
 
+    /// <summary>Toggles dark / light mode and notifies subscribers.</summary>
     public void ToggleTheme()
     {
         IsDarkMode = !IsDarkMode;
         OnThemeChanged?.Invoke();
     }
 
-    // ── Theme construction ────────────────────────────────────────────────────
+    /// <summary>
+    /// Rebuilds the theme with <paramref name="hexColor"/> as the primary accent
+    /// (darkened and lightened variants are computed automatically) and notifies all
+    /// subscribed components to re-render with the new palette.
+    /// </summary>
+    /// <param name="hexColor">
+    /// Hex colour string, with or without a leading <c>#</c>
+    /// (e.g. <c>"#FF8F00"</c> or <c>"FF8F00"</c>).
+    /// </param>
+    public void SetHubAccent(string hexColor)
+    {
+        if (string.IsNullOrWhiteSpace(hexColor)) return;
+        Theme = BuildTheme(hexColor);
+        OnThemeChanged?.Invoke();
+    }
 
-    private static MudTheme BuildTheme() => new()
+    // ── Theme construction ─────────────────────────────────────────────────────
+
+    private static MudTheme BuildTheme(string primaryHex) => new()
     {
         LayoutProperties = new LayoutProperties
         {
@@ -41,10 +69,10 @@ public sealed class ThemeService
 
         PaletteDark = new PaletteDark
         {
-            Primary             = "#7C4DFF",   // deep violet
-            PrimaryDarken       = "#5C35BF",
-            PrimaryLighten      = "#9E6FFF",
-            Secondary           = "#00BFA5",   // teal accent
+            Primary             = primaryHex,
+            PrimaryDarken       = DarkenHex(primaryHex),
+            PrimaryLighten      = LightenHex(primaryHex),
+            Secondary           = "#00BFA5",   // teal — constant across hub selections
             SecondaryDarken     = "#009688",
             Background          = "#0F0F14",
             BackgroundGray      = "#1A1A24",
@@ -68,7 +96,7 @@ public sealed class ThemeService
 
         PaletteLight = new PaletteLight
         {
-            Primary    = "#5C35BF",
+            Primary    = DarkenHex(primaryHex, 0.80),
             Secondary  = "#00897B",
             Background = "#F4F4F8",
             Surface    = "#FFFFFF",
@@ -77,9 +105,45 @@ public sealed class ThemeService
         Typography = new Typography
         {
             Default = new DefaultTypography { FontFamily = ["Roboto", "sans-serif"] },
-            H4      = new H4Typography    { FontWeight   = "600" },
-            H5      = new H5Typography    { FontWeight   = "600" },
-            H6      = new H6Typography    { FontWeight   = "600" },
+            H4      = new H4Typography     { FontWeight  = "600" },
+            H5      = new H5Typography     { FontWeight  = "600" },
+            H6      = new H6Typography     { FontWeight  = "600" },
         },
     };
+
+    // ── Colour helpers ─────────────────────────────────────────────────────────
+
+    /// <summary>Multiplies each RGB channel by <paramref name="factor"/> to produce a darker shade.</summary>
+    private static string DarkenHex(string hex, double factor = 0.72)
+    {
+        try
+        {
+            hex = hex.TrimStart('#');
+            if (hex.Length == 3) hex = $"{hex[0]}{hex[0]}{hex[1]}{hex[1]}{hex[2]}{hex[2]}";
+            if (hex.Length != 6) return $"#{hex}";
+
+            var r = Math.Clamp((int)(Convert.ToInt32(hex[..2],  16) * factor), 0, 255);
+            var g = Math.Clamp((int)(Convert.ToInt32(hex[2..4], 16) * factor), 0, 255);
+            var b = Math.Clamp((int)(Convert.ToInt32(hex[4..6], 16) * factor), 0, 255);
+            return $"#{r:X2}{g:X2}{b:X2}";
+        }
+        catch { return hex; }
+    }
+
+    /// <summary>Adds <paramref name="amount"/> to each RGB channel to produce a lighter shade.</summary>
+    private static string LightenHex(string hex, int amount = 48)
+    {
+        try
+        {
+            hex = hex.TrimStart('#');
+            if (hex.Length == 3) hex = $"{hex[0]}{hex[0]}{hex[1]}{hex[1]}{hex[2]}{hex[2]}";
+            if (hex.Length != 6) return $"#{hex}";
+
+            var r = Math.Clamp(Convert.ToInt32(hex[..2],  16) + amount, 0, 255);
+            var g = Math.Clamp(Convert.ToInt32(hex[2..4], 16) + amount, 0, 255);
+            var b = Math.Clamp(Convert.ToInt32(hex[4..6], 16) + amount, 0, 255);
+            return $"#{r:X2}{g:X2}{b:X2}";
+        }
+        catch { return hex; }
+    }
 }
