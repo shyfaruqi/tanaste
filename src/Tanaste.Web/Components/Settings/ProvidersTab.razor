@@ -1,0 +1,144 @@
+@namespace Tanaste.Web.Components.Settings
+@inject UIOrchestratorService Orchestrator
+
+@* Metadata Providers — enriched read-only view with domain, capability tags,
+   trust weights, and live reachability status. *@
+
+<MudPaper Elevation="0" Style="@GlassStyle">
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Outlined.Cloud" Color="Color.Primary" Class="mr-2" />
+        <MudText Typo="Typo.h6">Metadata Providers</MudText>
+    </MudStack>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        These are the sources I use to enrich your library. Each provider contributes
+        metadata with a per-field trust weight — higher weights win in scoring conflicts.
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_providers.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">
+            No providers are configured. Add provider entries to your manifest to see status here.
+        </MudAlert>
+    }
+    else
+    {
+        @foreach (var p in _providers)
+        {
+            <MudPaper Elevation="0" Style="@InnerCardStyle" Class="mb-3">
+
+                @* Row 1: Status dot + Name + Domain badge + Reachability *@
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Circle"
+                             Color="@(p.IsReachable ? Color.Success : (p.Enabled ? Color.Error : Color.Default))"
+                             Size="Size.Small" />
+                    <MudText Typo="Typo.subtitle1" Style="flex: 1; min-width: 0; font-weight: 600;">
+                        @p.DisplayName
+                    </MudText>
+
+                    @if (!string.IsNullOrEmpty(p.Domain))
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 Color="Color.Info">
+                            @p.Domain
+                        </MudChip>
+                    }
+
+                    @if (p.IsZeroKey)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 Color="Color.Warning">
+                            Zero-key
+                        </MudChip>
+                    }
+
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                             Color="@(p.Enabled ? (p.IsReachable ? Color.Success : Color.Error) : Color.Default)">
+                        @(p.Enabled ? (p.IsReachable ? "Reachable" : "Unreachable") : "Disabled")
+                    </MudChip>
+                </MudStack>
+
+                @* Row 2: Capability tags *@
+                @if (p.CapabilityTags is { Count: > 0 })
+                {
+                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center"
+                              Class="mb-2" Style="flex-wrap: wrap;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mr-1">
+                            Expert in:
+                        </MudText>
+                        @foreach (var tag in p.CapabilityTags)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary"
+                                     Variant="Variant.Text">
+                                @tag
+                            </MudChip>
+                        }
+                    </MudStack>
+                }
+
+                @* Row 3: Trust weight *@
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Default Trust:
+                    </MudText>
+                    <MudText Typo="Typo.caption" Style="font-weight: 600;">
+                        @((p.DefaultWeight * 100).ToString("F0"))%
+                    </MudText>
+                </MudStack>
+
+                @* Row 4: Per-field weights *@
+                @if (p.FieldWeights is { Count: > 0 })
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">
+                        Field-specific trust:
+                    </MudText>
+                    <MudStack Row="true" Spacing="1" Style="flex-wrap: wrap;">
+                        @foreach (var fw in p.FieldWeights.OrderByDescending(kv => kv.Value))
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                @fw.Key: @((fw.Value * 100).ToString("F0"))%
+                            </MudChip>
+                        }
+                    </MudStack>
+                }
+
+            </MudPaper>
+        }
+    }
+
+</MudPaper>
+
+@code {
+
+    private const string GlassStyle =
+        "background: rgba(22,22,36,0.55); " +
+        "border: 1px solid rgba(255,255,255,0.08); " +
+        "backdrop-filter: blur(10px); " +
+        "-webkit-backdrop-filter: blur(10px); " +
+        "border-radius: 24px; " +
+        "padding: 32px;";
+
+    private const string InnerCardStyle =
+        "background: rgba(255,255,255,0.03); " +
+        "border: 1px solid rgba(255,255,255,0.06); " +
+        "border-radius: 16px; " +
+        "padding: 20px;";
+
+    // ── State ────────────────────────────────────────────────────────────────────
+
+    private bool                             _loading   = true;
+    private IReadOnlyList<ProviderStatusDto> _providers = [];
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading   = true;
+        _providers = await Orchestrator.GetProviderStatusAsync();
+        _loading   = false;
+    }
+}

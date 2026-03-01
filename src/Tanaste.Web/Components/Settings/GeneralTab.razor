@@ -1,0 +1,116 @@
+@namespace Tanaste.Web.Components.Settings
+@inject ThemeService ThemeService
+@inject IJSRuntime JS
+@implements IDisposable
+
+@* General settings — appearance controls (dark/light mode, accent colour). *@
+
+<MudPaper Elevation="0" Style="@GlassStyle">
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Outlined.Palette" Color="Color.Primary" Class="mr-2" />
+        <MudText Typo="Typo.h6">Appearance</MudText>
+    </MudStack>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+        Customise how Tanaste looks and feels.
+    </MudText>
+
+    @* ── Dark / Light mode ──────────────────────────────────── *@
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudIcon Icon="@(_isDark ? Icons.Material.Filled.DarkMode : Icons.Material.Filled.LightMode)"
+                 Color="Color.Secondary" Class="mr-2" />
+        <MudText Style="flex: 1;">Dark Mode</MudText>
+        <MudSwitch T="bool"
+                   Value="@_isDark"
+                   ValueChanged="@ToggleDarkMode"
+                   Color="Color.Primary" />
+    </MudStack>
+
+    @* ── Accent colour ──────────────────────────────────────── *@
+    <MudText Typo="Typo.subtitle2" Class="mb-1">Accent Colour</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+        Choose a primary colour that tints buttons, progress bars, and active highlights.
+    </MudText>
+
+    <MudStack Row="true" Spacing="2" Style="flex-wrap: wrap;">
+        @foreach (var (hex, label) in _presets)
+        {
+            <MudTooltip Text="@label" Arrow="true" Placement="Placement.Top">
+                <MudAvatar Size="Size.Medium"
+                           Style="@SwatchStyle(hex)"
+                           @onclick="@(() => SetAccent(hex))" />
+            </MudTooltip>
+        }
+    </MudStack>
+
+</MudPaper>
+
+@code {
+
+    private const string GlassStyle =
+        "background: rgba(22,22,36,0.55); " +
+        "border: 1px solid rgba(255,255,255,0.08); " +
+        "backdrop-filter: blur(10px); " +
+        "-webkit-backdrop-filter: blur(10px); " +
+        "border-radius: 24px; " +
+        "padding: 32px;";
+
+    private bool _isDark = true;
+
+    // ── Accent colour presets ────────────────────────────────────────────────────
+
+    private static readonly (string Hex, string Label)[] _presets =
+    [
+        ("#7C4DFF", "Violet"),
+        ("#00BFA5", "Teal"),
+        ("#FF8F00", "Amber"),
+        ("#E91E63", "Pink"),
+        ("#2196F3", "Blue"),
+        ("#4CAF50", "Green"),
+        ("#FF5722", "Deep Orange"),
+        ("#9C27B0", "Purple"),
+    ];
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────────
+
+    protected override void OnInitialized()
+    {
+        _isDark = ThemeService.IsDarkMode;
+        ThemeService.OnThemeChanged += OnThemeUpdated;
+    }
+
+    public void Dispose() => ThemeService.OnThemeChanged -= OnThemeUpdated;
+
+    private void OnThemeUpdated()
+    {
+        _isDark = ThemeService.IsDarkMode;
+        InvokeAsync(StateHasChanged);
+    }
+
+    // ── Handlers ─────────────────────────────────────────────────────────────────
+
+    private async Task ToggleDarkMode(bool value)
+    {
+        ThemeService.ToggleTheme();
+        _isDark = ThemeService.IsDarkMode;
+        await JS.InvokeVoidAsync("setThemeClass", _isDark);
+    }
+
+    private void SetAccent(string hex)
+    {
+        ThemeService.SetHubAccent(hex);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    private string SwatchStyle(string hex)
+    {
+        // Show a bright ring when this swatch matches the current primary accent.
+        var currentPrimary = ThemeService.Theme.PaletteDark.Primary.ToString();
+        bool isActive = currentPrimary.Equals(hex, StringComparison.OrdinalIgnoreCase);
+
+        return $"background: {hex}; cursor: pointer; " +
+               $"border: 3px solid {(isActive ? "rgba(255,255,255,0.80)" : "rgba(255,255,255,0.10)")}; " +
+               "transition: border 0.2s ease;";
+    }
+}

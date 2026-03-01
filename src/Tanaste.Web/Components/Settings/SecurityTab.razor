@@ -1,0 +1,234 @@
+@namespace Tanaste.Web.Components.Settings
+@inject UIOrchestratorService Orchestrator
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+@* Guest API Keys — generate, view, copy, and revoke access keys. *@
+
+<MudPaper Elevation="0" Style="@GlassStyle">
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.VpnKey" Color="Color.Primary" Class="mr-2" />
+        <MudText Typo="Typo.h6">Guest API Keys</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@OpenGenerateDialog"
+                   Disabled="@_loading">
+            Generate Key
+        </MudButton>
+    </MudStack>
+
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        Any application connecting to the Engine — Radarr, Sonarr, a mobile app — must present
+        a valid Guest API Key. Each key is labelled and can be revoked individually.
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
+    }
+    else if (_keys.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-2">
+            No Guest API Keys have been issued yet. Generate one to allow external connections.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@_keys" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm"
+                  Style="background: transparent;">
+            <HeaderContent>
+                <MudTh>Label</MudTh>
+                <MudTh>Created</MudTh>
+                <MudTh Style="text-align:right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Key" Size="Size.Small"
+                                 Color="Color.Secondary" />
+                        <MudText>@context.Label</MudText>
+                    </MudStack>
+                </MudTd>
+                <MudTd>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @context.CreatedAt.LocalDateTime.ToString("MMM d, yyyy · HH:mm")
+                    </MudText>
+                </MudTd>
+                <MudTd Style="text-align:right">
+                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline"
+                                   Color="Color.Error"
+                                   Size="Size.Small"
+                                   title="Revoke this key"
+                                   OnClick="@(() => RevokeKeyAsync(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@* ── Generate Key dialog ─────────────────────────────────────────────────── *@
+<MudDialog @bind-Visible="_generateOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.VpnKey" Class="mr-2" />
+            Generate Guest API Key
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_newLabel"
+                      Label="Label"
+                      Placeholder="e.g. Radarr integration, Mobile app"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Class="mb-2"
+                      Immediate="true" />
+
+        @if (_newKey is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mt-4" Icon="@Icons.Material.Filled.Warning">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                    Copy this key now — it will not be shown again.
+                </MudText>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <code style="font-family: monospace; font-size: 0.85rem;
+                                  background: rgba(0,0,0,0.4); padding: 6px 12px;
+                                  border-radius: 8px; word-break: break-all; flex: 1;">
+                        @_newKey.Key
+                    </code>
+                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                   Size="Size.Small"
+                                   title="Copy key to clipboard"
+                                   OnClick="@CopyKeyAsync" />
+                </MudStack>
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_newKey is null)
+        {
+            <MudButton OnClick="@CloseGenerateDialog">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="@(string.IsNullOrWhiteSpace(_newLabel) || _generating)"
+                       OnClick="@GenerateKeyAsync">
+                @(_generating ? "Generating…" : "Generate")
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Filled.Check"
+                       OnClick="@DismissNewKey">
+                I've saved the key
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    private const string GlassStyle =
+        "background: rgba(22,22,36,0.55); " +
+        "border: 1px solid rgba(255,255,255,0.08); " +
+        "backdrop-filter: blur(10px); " +
+        "-webkit-backdrop-filter: blur(10px); " +
+        "border-radius: 24px; " +
+        "padding: 32px;";
+
+    // ── State ────────────────────────────────────────────────────────────────────
+
+    private bool                  _loading      = true;
+    private List<ApiKeyViewModel> _keys         = [];
+    private bool                  _generateOpen;
+    private bool                  _generating;
+    private string                _newLabel     = string.Empty;
+    private NewApiKeyViewModel?   _newKey;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth         = MaxWidth.Small,
+        FullWidth        = true,
+        CloseOnEscapeKey = true,
+    };
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshKeysAsync();
+    }
+
+    // ── Handlers ─────────────────────────────────────────────────────────────────
+
+    private async Task RefreshKeysAsync()
+    {
+        _loading = true;
+        _keys    = await Orchestrator.GetApiKeysAsync();
+        _loading = false;
+    }
+
+    private void OpenGenerateDialog()
+    {
+        _newLabel     = string.Empty;
+        _newKey       = null;
+        _generateOpen = true;
+    }
+
+    private void CloseGenerateDialog()
+    {
+        _generateOpen = false;
+        _newKey       = null;
+        _newLabel     = string.Empty;
+    }
+
+    private async Task GenerateKeyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newLabel)) return;
+        _generating = true;
+        _newKey     = await Orchestrator.CreateApiKeyAsync(_newLabel.Trim());
+        _generating = false;
+
+        if (_newKey is null)
+        {
+            Snackbar.Add("Could not generate key — is the Engine running?", Severity.Error);
+            _generateOpen = false;
+        }
+        else
+        {
+            await RefreshKeysAsync();
+        }
+    }
+
+    private async Task CopyKeyAsync()
+    {
+        if (_newKey is null) return;
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _newKey.Key);
+        Snackbar.Add("Key copied to clipboard", Severity.Success);
+    }
+
+    private async Task DismissNewKey()
+    {
+        _newKey       = null;
+        _generateOpen = false;
+        _newLabel     = string.Empty;
+        await RefreshKeysAsync();
+    }
+
+    private async Task RevokeKeyAsync(ApiKeyViewModel key)
+    {
+        var ok = await Orchestrator.RevokeApiKeyAsync(key.Id);
+        if (ok)
+        {
+            Snackbar.Add($"Key \"{key.Label}\" revoked", Severity.Info);
+            await RefreshKeysAsync();
+        }
+        else
+        {
+            Snackbar.Add("Revoke failed — is the Engine running?", Severity.Error);
+        }
+    }
+}

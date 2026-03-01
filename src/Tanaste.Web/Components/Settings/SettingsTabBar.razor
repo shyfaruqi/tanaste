@@ -1,0 +1,83 @@
+@namespace Tanaste.Web.Components.Settings
+
+@* Horizontal icon-tab navigation strip for the Settings page.
+   Mirrors the Intent Dock's visual language — large icons with labels,
+   glassmorphic background, active tab highlighted. *@
+
+<MudPaper Elevation="0" Class="settings-tab-bar mb-6">
+    <MudStack Row="true" Spacing="0" Justify="Justify.Center" AlignItems="AlignItems.Center">
+
+        @foreach (var tab in _tabs)
+        {
+            <div class="settings-tab-item @(ActiveTab == tab.Value ? "active" : "")"
+                 @onclick="@(() => SetTab(tab.Value))">
+                <MudIcon Icon="@tab.Icon"
+                         Size="Size.Large"
+                         Color="@(ActiveTab == tab.Value ? Color.Primary : Color.Default)" />
+                <MudText Typo="Typo.caption"
+                         Style="@(ActiveTab == tab.Value
+                             ? "color: var(--mud-palette-primary);"
+                             : "color: rgba(255,255,255,0.50);")">
+                    @tab.Label
+                </MudText>
+            </div>
+        }
+
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public SettingsTab ActiveTab { get; set; } = SettingsTab.General;
+    [Parameter] public EventCallback<SettingsTab> OnTabChanged { get; set; }
+
+    private async Task SetTab(SettingsTab tab)
+    {
+        ActiveTab = tab;
+        await OnTabChanged.InvokeAsync(tab);
+    }
+
+    // Tab definitions — icon + label + enum value.
+    private static readonly TabDef[] _tabs =
+    [
+        new(SettingsTab.General,   Icons.Material.Outlined.Settings,   "General"),
+        new(SettingsTab.Folders,   Icons.Material.Outlined.FolderOpen, "Folders"),
+        new(SettingsTab.Providers, Icons.Material.Outlined.Cloud,      "Providers"),
+        new(SettingsTab.Security,  Icons.Material.Outlined.Shield,     "Security"),
+    ];
+
+    private sealed record TabDef(SettingsTab Value, string Icon, string Label);
+
+    /// <summary>Settings page tab identifiers.</summary>
+    public enum SettingsTab { General, Folders, Providers, Security }
+}
+
+<style>
+    .settings-tab-bar {
+        background: rgba(22, 22, 36, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 24px;
+        padding: 16px 32px;
+    }
+
+    .settings-tab-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 12px 24px;
+        border-radius: 16px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+        user-select: none;
+    }
+
+    .settings-tab-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .settings-tab-item.active {
+        background: rgba(124, 77, 255, 0.18);
+    }
+</style>

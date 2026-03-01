@@ -353,4 +353,16 @@ public sealed class ProviderStatusResponse
 
     [JsonPropertyName("is_reachable")]
     public bool IsReachable { get; init; }
+
+    [JsonPropertyName("domain")]
+    public string Domain { get; init; } = string.Empty;
+
+    [JsonPropertyName("capability_tags")]
+    public List<string> CapabilityTags { get; init; } = [];
+
+    [JsonPropertyName("default_weight")]
+    public double DefaultWeight { get; init; }
+
+    [JsonPropertyName("field_weights")]
+    public Dictionary<string, double> FieldWeights { get; init; } = [];
 }

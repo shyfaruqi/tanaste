@@ -546,8 +546,16 @@ src/Tanaste.Web/
 │   │   ├── CommandPalette.razor        Ctrl+K global search and navigation
 │   │   └── IntentDock.razor            Floating bottom dock: Hubs / Watch / Read / Listen
 │   │
+│   ├── Settings/             ← Settings page tab components
+│   │   ├── SettingsTabBar.razor       Icon-based tab navigation strip (defines SettingsTab enum)
+│   │   ├── GeneralTab.razor           Appearance: dark/light toggle + accent colour swatches
+│   │   ├── FoldersTab.razor           Watch Folder + Library Folder configuration
+│   │   ├── ProvidersTab.razor         Enriched provider cards: domain, tags, weights, reachability
+│   │   └── SecurityTab.razor          Guest API Keys: generate, revoke, copy-to-clipboard
+│   │
 │   └── Pages/                ← Full-page views (routed)
 │       ├── Home.razor                  Library overview page
+│       ├── Settings.razor              Tab-shell: delegates to Settings/* components
 │       └── NotFound.razor              404 page
 │
 ├── Models/

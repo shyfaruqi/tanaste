@@ -27,6 +27,8 @@ public static class SettingsEndpoints
             ["apple_books_audiobook"] = "Apple Books (Audiobooks)",
             ["audnexus"]              = "Audnexus",
             ["wikidata"]              = "Wikidata",
+            ["local_filesystem"]      = "Local Filesystem",
+            ["open_library"]          = "Open Library",
         };
 
     // Maps provider name → key in manifest.ProviderEndpoints for the reachability probe.
@@ -180,11 +182,15 @@ public static class SettingsEndpoints
 
                 return new ProviderStatusResponse
                 {
-                    Name        = name,
-                    DisplayName = displayName,
-                    Enabled     = provider.Enabled,
-                    IsZeroKey   = true, // All current providers are zero-key (no API credentials needed).
-                    IsReachable = isReachable,
+                    Name           = name,
+                    DisplayName    = displayName,
+                    Enabled        = provider.Enabled,
+                    IsZeroKey      = true, // All current providers are zero-key (no API credentials needed).
+                    IsReachable    = isReachable,
+                    Domain         = provider.Domain.ToString(),
+                    CapabilityTags = provider.CapabilityTags,
+                    DefaultWeight  = provider.Weight,
+                    FieldWeights   = provider.FieldWeights,
                 };
             });
 
