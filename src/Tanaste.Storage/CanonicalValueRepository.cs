@@ -14,7 +14,8 @@ namespace Tanaste.Storage;
 /// lives here.
 ///
 /// Spec: Phase 4 – Canonical Integrity invariant;
-///       Phase 9 – External Metadata Adapters § Canonical Persistence.
+///       Phase 9 – External Metadata Adapters § Canonical Persistence;
+///       Phase B – Conflict Surfacing (B-05).
 /// </summary>
 public sealed class CanonicalValueRepository : ICanonicalValueRepository
 {
@@ -53,15 +54,16 @@ public sealed class CanonicalValueRepository : ICanonicalValueRepository
             // new value and timestamp.
             cmd.CommandText = """
                 INSERT OR REPLACE INTO canonical_values
-                    (entity_id, key, value, last_scored_at)
+                    (entity_id, key, value, last_scored_at, is_conflicted)
                 VALUES
-                    (@entity_id, @key, @value, @last_scored_at);
+                    (@entity_id, @key, @value, @last_scored_at, @is_conflicted);
                 """;
 
             var pEntityId      = cmd.Parameters.Add("@entity_id",      SqliteType.Text);
             var pKey           = cmd.Parameters.Add("@key",            SqliteType.Text);
             var pValue         = cmd.Parameters.Add("@value",          SqliteType.Text);
             var pLastScoredAt  = cmd.Parameters.Add("@last_scored_at", SqliteType.Text);
+            var pIsConflicted  = cmd.Parameters.Add("@is_conflicted",  SqliteType.Integer);
 
             foreach (var cv in values)
             {
@@ -71,6 +73,7 @@ public sealed class CanonicalValueRepository : ICanonicalValueRepository
                 pKey.Value          = cv.Key;
                 pValue.Value        = cv.Value;
                 pLastScoredAt.Value = cv.LastScoredAt.ToString("o"); // ISO-8601 round-trip
+                pIsConflicted.Value = cv.IsConflicted ? 1 : 0;
 
                 cmd.ExecuteNonQuery();
             }
@@ -96,12 +99,38 @@ public sealed class CanonicalValueRepository : ICanonicalValueRepository
         var conn = _db.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT entity_id, key, value, last_scored_at
+            SELECT entity_id, key, value, last_scored_at, is_conflicted
             FROM   canonical_values
             WHERE  entity_id = @entity_id
             ORDER  BY key ASC;
             """;
         cmd.Parameters.AddWithValue("@entity_id", entityId.ToString());
+
+        var results = new List<CanonicalValue>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            ct.ThrowIfCancellationRequested();
+            results.Add(MapRow(reader));
+        }
+
+        return Task.FromResult<IReadOnlyList<CanonicalValue>>(results);
+    }
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<CanonicalValue>> GetConflictedAsync(
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var conn = _db.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT entity_id, key, value, last_scored_at, is_conflicted
+            FROM   canonical_values
+            WHERE  is_conflicted = 1
+            ORDER  BY last_scored_at DESC;
+            """;
 
         var results = new List<CanonicalValue>();
         using var reader = cmd.ExecuteReader();
@@ -121,7 +150,7 @@ public sealed class CanonicalValueRepository : ICanonicalValueRepository
     /// <summary>
     /// Maps the current reader row to a <see cref="CanonicalValue"/>.
     /// Column ordinals match the SELECT list used in every query in this class:
-    ///   0=entity_id, 1=key, 2=value, 3=last_scored_at
+    ///   0=entity_id, 1=key, 2=value, 3=last_scored_at, 4=is_conflicted
     /// </summary>
     private static CanonicalValue MapRow(SqliteDataReader r) => new()
     {
@@ -129,5 +158,6 @@ public sealed class CanonicalValueRepository : ICanonicalValueRepository
         Key           = r.GetString(1),
         Value         = r.GetString(2),
         LastScoredAt  = DateTimeOffset.Parse(r.GetString(3)),
+        IsConflicted  = r.GetInt32(4) == 1,
     };
 }

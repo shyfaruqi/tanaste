@@ -77,6 +77,11 @@ public interface ITanasteApiClient
     /// <summary>PATCH /metadata/lock-claim — create a user-locked claim.</summary>
     Task<bool> LockClaimAsync(Guid entityId, string key, string value, CancellationToken ct = default);
 
+    // ── Conflicts (/metadata/conflicts) ──────────────────────────────────────
+
+    /// <summary>GET /metadata/conflicts — canonical values with unresolved metadata conflicts.</summary>
+    Task<List<ConflictViewModel>> GetConflictsAsync(CancellationToken ct = default);
+
     // ── Settings (/settings) ──────────────────────────────────────────────────
 
     /// <summary>GET /settings/folders — current Watch Folder + Library Folder paths.</summary>
@@ -93,6 +98,14 @@ public interface ITanasteApiClient
 
     /// <summary>PUT /settings/providers/{name} — toggle a provider's enabled state.</summary>
     Task<bool> UpdateProviderAsync(string name, bool enabled, CancellationToken ct = default);
+
+    // ── Organization template ─────────────────────────────────────────────────
+
+    /// <summary>GET /settings/organization-template — current file organization template + preview.</summary>
+    Task<OrganizationTemplateDto?> GetOrganizationTemplateAsync(CancellationToken ct = default);
+
+    /// <summary>PUT /settings/organization-template — save a new file organization template.</summary>
+    Task<OrganizationTemplateDto?> UpdateOrganizationTemplateAsync(string template, CancellationToken ct = default);
 
     /// <summary>
     /// Most recent error message from the last failed API call.

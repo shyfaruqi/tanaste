@@ -33,4 +33,12 @@ public interface ICanonicalValueRepository
     Task<IReadOnlyList<CanonicalValue>> GetByEntityAsync(
         Guid entityId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns all canonical values that have unresolved conflicts, ordered by
+    /// most recently scored first.
+    /// Spec: Phase B – Conflict Surfacing (B-05).
+    /// </summary>
+    Task<IReadOnlyList<CanonicalValue>> GetConflictedAsync(
+        CancellationToken ct = default);
 }

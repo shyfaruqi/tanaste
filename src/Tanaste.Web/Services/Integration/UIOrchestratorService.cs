@@ -145,6 +145,16 @@ public sealed class UIOrchestratorService : IAsyncDisposable
     public Task<List<ProfileViewModel>> GetProfilesAsync(CancellationToken ct = default)
         => _api.GetProfilesAsync(ct);
 
+    /// <summary>
+    /// Returns the currently active profile (first profile — the seed Owner by default).
+    /// Ready for future session-based profile selection.
+    /// </summary>
+    public async Task<ProfileViewModel?> GetActiveProfileAsync(CancellationToken ct = default)
+    {
+        var profiles = await GetProfilesAsync(ct);
+        return profiles?.FirstOrDefault();
+    }
+
     /// <summary>Creates a new user profile. Returns true on success.</summary>
     public async Task<bool> CreateProfileAsync(
         string displayName, string avatarColor, string role,
@@ -221,10 +231,29 @@ public sealed class UIOrchestratorService : IAsyncDisposable
 
     /// <summary>
     /// Fires when the Engine reports a folder health change via SignalR.
-    /// Parameters: (folderType: "watch" | "library", isHealthy: bool).
+    /// Parameters: (path, isHealthy).
     /// Components should call <c>InvokeAsync(StateHasChanged)</c> in their handler.
     /// </summary>
     public event Action<string, bool>? OnFolderHealthChanged;
+
+    // ── Conflicts ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns all canonical values that have unresolved metadata conflicts.
+    /// Spec: Phase B – Conflict Surfacing (B-05).
+    /// </summary>
+    public Task<List<ConflictViewModel>> GetConflictsAsync(CancellationToken ct = default)
+        => _api.GetConflictsAsync(ct);
+
+    // ── Organization Template ─────────────────────────────────────────────────
+
+    /// <summary>Gets the current file organization template and sample preview.</summary>
+    public Task<OrganizationTemplateDto?> GetOrganizationTemplateAsync(CancellationToken ct = default)
+        => _api.GetOrganizationTemplateAsync(ct);
+
+    /// <summary>Saves a new file organization template. Returns the result with preview, or null on failure.</summary>
+    public Task<OrganizationTemplateDto?> UpdateOrganizationTemplateAsync(string template, CancellationToken ct = default)
+        => _api.UpdateOrganizationTemplateAsync(template, ct);
 
     // ── SignalR Intercom ───────────────────────────────────────────────────────
 

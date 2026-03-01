@@ -273,6 +273,19 @@ public sealed class TanasteApiClient : ITanasteApiClient
         catch { return false; }
     }
 
+    // ── /metadata/conflicts ────────────────────────────────────────────────────
+
+    public async Task<List<ConflictViewModel>> GetConflictsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var raw = await _http.GetFromJsonAsync<List<ConflictViewModel>>(
+                "/metadata/conflicts", ct);
+            return raw ?? [];
+        }
+        catch { return []; }
+    }
+
     // ── /settings ─────────────────────────────────────────────────────────────
 
     public async Task<FolderSettingsDto?> GetFolderSettingsAsync(CancellationToken ct = default)
@@ -389,6 +402,52 @@ public sealed class TanasteApiClient : ITanasteApiClient
             _logger.LogWarning(ex, "PUT /settings/providers/{Name} failed", name);
             LastError = ex.Message;
             return false;
+        }
+    }
+
+    // ── Organization template ────────────────────────────────────────────────
+
+    public async Task<OrganizationTemplateDto?> GetOrganizationTemplateAsync(
+        CancellationToken ct = default)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<OrganizationTemplateDto>(
+                "/settings/organization-template", ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "GET /settings/organization-template failed");
+            LastError = ex.Message;
+            return null;
+        }
+    }
+
+    public async Task<OrganizationTemplateDto?> UpdateOrganizationTemplateAsync(
+        string template, CancellationToken ct = default)
+    {
+        try
+        {
+            var body = new { template };
+            var resp = await _http.PutAsJsonAsync("/settings/organization-template", body, ct);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var detail = await resp.Content.ReadAsStringAsync(ct);
+                _logger.LogWarning(
+                    "PUT /settings/organization-template returned {Status}: {Detail}",
+                    (int)resp.StatusCode, detail);
+                LastError = $"HTTP {(int)resp.StatusCode}: {detail}";
+                return null;
+            }
+
+            return await resp.Content.ReadFromJsonAsync<OrganizationTemplateDto>(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "PUT /settings/organization-template failed");
+            LastError = ex.Message;
+            return null;
         }
     }
 

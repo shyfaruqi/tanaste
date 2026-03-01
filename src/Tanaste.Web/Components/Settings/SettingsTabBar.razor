@@ -1,49 +1,62 @@
 @namespace Tanaste.Web.Components.Settings
 
-@* Horizontal icon-tab navigation strip for the Settings page.
+@* Horizontal icon-tab navigation strip for Settings pages.
    Mirrors the Intent Dock's visual language — large icons with labels,
    glassmorphic background, active tab highlighted.
 
-   Role-based visibility: Admin-only tabs are hidden when CurrentRole != Administrator. *@
+   Supports two modes via the Category parameter:
+     "Preferences"    → General, Playback
+     "ServerSettings" → Libraries, Metadata, Connectivity, API Keys, Users, Maintenance
+
+   Role-based visibility: Admin-only tabs are hidden when CurrentRole
+   is not Administrator or Curator. *@
 
 <MudPaper Elevation="0" Class="settings-tab-bar mb-6">
     <MudStack Row="true" Spacing="0" Justify="Justify.Center" AlignItems="AlignItems.Center"
               Style="flex-wrap: wrap;">
 
-        @foreach (var tab in _tabs)
+        @foreach (var tab in FilteredTabs)
         {
-            @if (!tab.AdminOnly || IsAdmin)
-            {
-                <div class="settings-tab-item @(ActiveTab == tab.Value ? "active" : "")"
-                     @onclick="@(() => SetTab(tab.Value))">
-                    <MudIcon Icon="@tab.Icon"
-                             Size="Size.Large"
-                             Color="@(ActiveTab == tab.Value ? Color.Primary : Color.Default)" />
-                    <MudText Typo="Typo.caption"
-                             Style="@(ActiveTab == tab.Value
-                                 ? "color: var(--mud-palette-primary);"
-                                 : "color: var(--tanaste-text-muted);")">
-                        @tab.Label
-                    </MudText>
-                </div>
-            }
+            <div class="settings-tab-item @(ActiveTab == tab.Value ? "active" : "")"
+                 @onclick="@(() => SetTab(tab.Value))">
+                <MudIcon Icon="@tab.Icon"
+                         Size="Size.Large"
+                         Color="@(ActiveTab == tab.Value ? Color.Primary : Color.Default)" />
+                <MudText Typo="Typo.caption"
+                         Style="@(ActiveTab == tab.Value
+                             ? "color: var(--mud-palette-primary);"
+                             : "color: var(--tanaste-text-muted);")">
+                    @tab.Label
+                </MudText>
+            </div>
         }
 
     </MudStack>
 </MudPaper>
 
 @code {
-    [Parameter] public SettingsTab ActiveTab { get; set; } = SettingsTab.Profile;
+    [Parameter] public SettingsTab ActiveTab { get; set; } = SettingsTab.General;
     [Parameter] public EventCallback<SettingsTab> OnTabChanged { get; set; }
 
     /// <summary>
+    /// Which tab category to display: "Preferences" or "ServerSettings".
+    /// </summary>
+    [Parameter] public string Category { get; set; } = "Preferences";
+
+    /// <summary>
     /// The role of the currently active profile.
-    /// When not "Administrator", admin-only tabs are hidden.
+    /// When not "Administrator" or "Curator", admin-only tabs are hidden.
     /// </summary>
     [Parameter] public string CurrentRole { get; set; } = "Administrator";
 
-    private bool IsAdmin =>
-        string.Equals(CurrentRole, "Administrator", StringComparison.OrdinalIgnoreCase);
+    private bool HasAdminAccess =>
+        string.Equals(CurrentRole, "Administrator", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(CurrentRole, "Curator", StringComparison.OrdinalIgnoreCase);
+
+    private IEnumerable<TabDef> FilteredTabs =>
+        _tabs.Where(t =>
+            t.Category == Category
+            && (!t.AdminOnly || HasAdminAccess));
 
     private async Task SetTab(SettingsTab tab)
     {
@@ -51,27 +64,30 @@
         await OnTabChanged.InvokeAsync(tab);
     }
 
-    // Tab definitions — icon + label + enum value + admin-only flag.
+    // Tab definitions — icon + label + enum value + admin-only flag + category.
     private static readonly TabDef[] _tabs =
     [
-        new(SettingsTab.Profile,       Icons.Material.Outlined.Person,        "Profile",       false),
-        new(SettingsTab.Appearance,    Icons.Material.Outlined.Palette,       "Appearance",    false),
-        new(SettingsTab.Playback,      Icons.Material.Outlined.PlayArrow,     "Playback",      false),
-        new(SettingsTab.Libraries,     Icons.Material.Outlined.FolderOpen,    "Libraries",     true),
-        new(SettingsTab.Metadata,      Icons.Material.Outlined.Cloud,         "Metadata",      false),
-        new(SettingsTab.Connectivity,  Icons.Material.Outlined.Wifi,          "Connectivity",  true),
-        new(SettingsTab.ApiKeys,       Icons.Material.Outlined.VpnKey,        "API Keys",      true),
-        new(SettingsTab.Users,         Icons.Material.Outlined.Group,         "Users",         true),
-        new(SettingsTab.Maintenance,   Icons.Material.Outlined.Build,         "Maintenance",   true),
+        // Preferences tabs
+        new(SettingsTab.General,       Icons.Material.Outlined.Tune,          "General",       false, "Preferences"),
+        new(SettingsTab.Playback,      Icons.Material.Outlined.PlayArrow,     "Playback",      false, "Preferences"),
+
+        // Server Settings tabs
+        new(SettingsTab.Libraries,     Icons.Material.Outlined.FolderOpen,    "Libraries",     true,  "ServerSettings"),
+        new(SettingsTab.Metadata,      Icons.Material.Outlined.Cloud,         "Metadata",      false, "ServerSettings"),
+        new(SettingsTab.Connectivity,  Icons.Material.Outlined.Wifi,          "Connectivity",  true,  "ServerSettings"),
+        new(SettingsTab.ApiKeys,       Icons.Material.Outlined.VpnKey,        "API Keys",      true,  "ServerSettings"),
+        new(SettingsTab.Conflicts,    Icons.Material.Outlined.Warning,       "Conflicts",     true,  "ServerSettings"),
+        new(SettingsTab.Users,         Icons.Material.Outlined.Group,         "Users",         true,  "ServerSettings"),
+        new(SettingsTab.Maintenance,   Icons.Material.Outlined.Build,         "Maintenance",   true,  "ServerSettings"),
     ];
 
-    private sealed record TabDef(SettingsTab Value, string Icon, string Label, bool AdminOnly);
+    private sealed record TabDef(SettingsTab Value, string Icon, string Label, bool AdminOnly, string Category);
 
-    /// <summary>Settings page tab identifiers.</summary>
+    /// <summary>Settings page tab identifiers (shared across Preferences and Server Settings).</summary>
     public enum SettingsTab
     {
-        Profile, Appearance, Playback, Libraries, Metadata,
-        Connectivity, ApiKeys, Users, Maintenance
+        General, Playback,
+        Libraries, Metadata, Connectivity, ApiKeys, Conflicts, Users, Maintenance
     }
 }
 

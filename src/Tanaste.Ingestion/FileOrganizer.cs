@@ -61,6 +61,21 @@ public sealed class FileOrganizer : IFileOrganizer
         _logger = logger;
     }
 
+    // Matches an optional leading space followed by ({Token}) — used for conditional groups.
+    private static readonly System.Text.RegularExpressions.Regex ConditionalGroupRegex = new(
+        @"\s?\(\{([^}]+)\}\)",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // Matches any remaining {Token} references not inside parentheses.
+    private static readonly System.Text.RegularExpressions.Regex UnresolvedTokenRegex = new(
+        @"\{[^}]+\}",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    // Matches two or more consecutive whitespace characters.
+    private static readonly System.Text.RegularExpressions.Regex MultiSpaceRegex = new(
+        @"\s{2,}",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
+
     // -------------------------------------------------------------------------
     // IFileOrganizer
     // -------------------------------------------------------------------------
@@ -80,17 +95,64 @@ public sealed class FileOrganizer : IFileOrganizer
         ArgumentException.ThrowIfNullOrWhiteSpace(template);
         ArgumentNullException.ThrowIfNull(candidate);
 
-        // Build the token dictionary from the candidate's metadata claims.
         var tokens = BuildTokens(candidate, extraTokens);
 
-        // Replace each {Token} in the template with the resolved value.
-        string resolved = template;
-        foreach (var (key, value) in tokens)
-            resolved = resolved.Replace($"{{{key}}}", Sanitize(value), StringComparison.OrdinalIgnoreCase);
+        string resolved = ResolveTemplate(template, tokens);
 
-        // Replace any remaining un-resolved tokens with "Unknown".
-        resolved = System.Text.RegularExpressions.Regex.Replace(
-            resolved, @"\{[^}]+\}", "Unknown");
+        return resolved;
+    }
+
+    /// <inheritdoc/>
+    public string? ValidateTemplate(string template, out string? error)
+    {
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            error = "Template cannot be empty.";
+            return null;
+        }
+
+        // Build sample tokens with representative values.
+        var sampleTokens = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Title"]     = "Sample Book",
+            ["Author"]    = "Jane Author",
+            ["Year"]      = "2024",
+            ["MediaType"] = "Epub",
+            ["Extension"] = "epub",
+            ["Ext"]       = ".epub",
+            ["Series"]    = "Great Series",
+            ["Publisher"]  = "Publisher Co",
+            ["Category"]  = "Books",
+            ["HubName"]   = "Sample Book",
+            ["Format"]    = "Epub",
+            ["Edition"]   = "Hardcover",
+        };
+
+        string resolved = ResolveTemplate(template, sampleTokens);
+
+        // Validate: no empty parentheses.
+        if (resolved.Contains("()", StringComparison.Ordinal))
+        {
+            error = "Template produces empty parentheses '()'. Check your token names.";
+            return null;
+        }
+
+        // Validate: no double spaces.
+        if (resolved.Contains("  ", StringComparison.Ordinal))
+        {
+            error = "Template produces double spaces. Check token placement.";
+            return null;
+        }
+
+        // Validate: no consecutive path separators.
+        if (resolved.Contains("//", StringComparison.Ordinal)
+            || resolved.Contains("\\\\", StringComparison.Ordinal))
+        {
+            error = "Template produces consecutive path separators.";
+            return null;
+        }
 
         return resolved;
     }
@@ -149,6 +211,62 @@ public sealed class FileOrganizer : IFileOrganizer
     }
 
     // -------------------------------------------------------------------------
+    // Template resolution engine
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Three-pass conditional template resolution:
+    /// 1. Resolve conditional groups: <c> ({Token})</c> — collapse entirely when token is empty.
+    /// 2. Resolve remaining bare <c>{Token}</c> references via standard replacement.
+    /// 3. Cleanup: collapse multiple spaces, trim each path segment.
+    /// </summary>
+    private static string ResolveTemplate(string template, Dictionary<string, string> tokens)
+    {
+        // Pass 1 — Conditional groups: ` ({Token})` or `({Token})`
+        // If the token value is empty/whitespace, remove the entire group (incl. leading space).
+        // If the token has content, replace with ` (Value)` preserving the leading space.
+        string resolved = ConditionalGroupRegex.Replace(template, match =>
+        {
+            string tokenName = match.Groups[1].Value;
+            bool hasLeadingSpace = match.Value.Length > 0 && char.IsWhiteSpace(match.Value[0]);
+
+            if (tokens.TryGetValue(tokenName, out var value)
+                && !string.IsNullOrWhiteSpace(value))
+            {
+                string sanitized = Sanitize(value);
+                if (!string.IsNullOrWhiteSpace(sanitized) && sanitized != "Unknown")
+                    return hasLeadingSpace ? $" ({sanitized})" : $"({sanitized})";
+            }
+
+            // Token is empty/missing — collapse the entire group.
+            return string.Empty;
+        });
+
+        // Pass 2 — Standard token replacement for remaining {Token} references.
+        // For bare (non-conditional) tokens, empty values become "Unknown".
+        foreach (var (key, value) in tokens)
+        {
+            string sanitized = Sanitize(value);
+            string replacement = string.IsNullOrEmpty(sanitized) ? "Unknown" : sanitized;
+            resolved = resolved.Replace($"{{{key}}}", replacement, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Replace any still-unresolved tokens with "Unknown".
+        resolved = UnresolvedTokenRegex.Replace(resolved, "Unknown");
+
+        // Pass 3 — Cleanup.
+        resolved = MultiSpaceRegex.Replace(resolved, " ");
+
+        // Trim each path segment individually.
+        var segments = resolved.Split('/');
+        for (int i = 0; i < segments.Length; i++)
+            segments[i] = segments[i].Trim();
+        resolved = string.Join('/', segments);
+
+        return resolved;
+    }
+
+    // -------------------------------------------------------------------------
     // Token resolution
     // -------------------------------------------------------------------------
 
@@ -160,20 +278,23 @@ public sealed class FileOrganizer : IFileOrganizer
         // We try known claim keys; fall back to "Unknown" for absent keys.
         var meta = candidate.Metadata ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+        var ext = Path.GetExtension(candidate.Path); // includes the dot: ".epub"
+
         var tokens = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["Title"]     = meta.GetValueOrDefault("title",     "Unknown"),
             ["Author"]    = meta.GetValueOrDefault("author",    "Unknown"),
-            ["Year"]      = meta.GetValueOrDefault("year",      "Unknown"),
+            ["Year"]      = meta.GetValueOrDefault("year",      string.Empty),
             ["MediaType"] = candidate.DetectedMediaType?.ToString() ?? "Unknown",
-            ["Extension"] = Path.GetExtension(candidate.Path).TrimStart('.'),
+            ["Extension"] = ext.TrimStart('.'),
+            ["Ext"]       = ext,     // includes the dot — e.g. ".epub"
             ["Series"]    = meta.GetValueOrDefault("series",    "Unknown"),
             ["Publisher"] = meta.GetValueOrDefault("publisher", "Unknown"),
-            // ── Phase 7: Hub-First template tokens ───────────────────────────────
+            // ── Hub-First template tokens ────────────────────────────────────────
             ["Category"]  = ResolveCategoryFromMediaType(candidate.DetectedMediaType),
             ["HubName"]   = meta.GetValueOrDefault("title",   "Unknown"),
             ["Format"]    = candidate.DetectedMediaType?.ToString() ?? "Unknown",
-            ["Edition"]   = meta.GetValueOrDefault("edition", "Standard"),
+            ["Edition"]   = meta.GetValueOrDefault("edition", string.Empty),
         };
 
         // Merge caller-supplied extras (allow overriding built-ins).
@@ -191,10 +312,12 @@ public sealed class FileOrganizer : IFileOrganizer
     /// <summary>
     /// Removes characters that are illegal in a path segment.
     /// Collapses multiple spaces and trims the result.
+    /// Returns empty string for empty/whitespace input (instead of "Unknown")
+    /// so that conditional template groups can detect empty values.
     /// </summary>
     private static string Sanitize(string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return "Unknown";
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
 
         var sb = new System.Text.StringBuilder(value.Length);
         foreach (char c in value)
@@ -206,8 +329,8 @@ public sealed class FileOrganizer : IFileOrganizer
         }
 
         // Collapse sequences of spaces and trim.
-        string result = System.Text.RegularExpressions.Regex.Replace(sb.ToString(), @"\s{2,}", " ").Trim();
-        return string.IsNullOrEmpty(result) ? "Unknown" : result;
+        string result = MultiSpaceRegex.Replace(sb.ToString(), " ").Trim();
+        return result;
     }
 
     /// <summary>

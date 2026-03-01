@@ -222,6 +222,7 @@ public sealed class MetadataHarvestingService : IMetadataHarvestingService, IAsy
             var scored = await _scoringEngine.ScoreEntityAsync(scoringContext, ct).ConfigureAwait(false);
 
             // Upsert canonical values (current best answers).
+            // Phase B: also persist the IsConflicted flag from the scoring engine.
             var canonicals = scored.FieldScores
                 .Where(f => !string.IsNullOrEmpty(f.WinningValue))
                 .Select(f => new CanonicalValue
@@ -230,6 +231,7 @@ public sealed class MetadataHarvestingService : IMetadataHarvestingService, IAsy
                     Key          = f.Key,
                     Value        = f.WinningValue!,
                     LastScoredAt = scored.ScoredAt,
+                    IsConflicted = f.IsConflicted,
                 })
                 .ToList();
             await _canonicalRepo.UpsertBatchAsync(canonicals, ct).ConfigureAwait(false);

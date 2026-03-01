@@ -65,6 +65,16 @@ public sealed class TanasteMasterManifest
     [JsonPropertyName("library_root")]
     public string LibraryRoot { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Tokenized path template for file organization.
+    /// When set (non-empty), overrides the <c>Ingestion:OrganizationTemplate</c>
+    /// default from <c>appsettings.json</c>.
+    /// Supports conditional groups: <c>({Token})</c> — when the token is empty,
+    /// the parentheses and leading space are collapsed.
+    /// </summary>
+    [JsonPropertyName("organization_template")]
+    public string OrganizationTemplate { get; set; } = string.Empty;
+
     /// <summary>Provider bootstrap entries loaded before the provider_registry table is queried.</summary>
     [JsonPropertyName("providers")]
     public List<ProviderBootstrap> Providers { get; set; } = [];

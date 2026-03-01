@@ -33,6 +33,20 @@ public static class MetadataEndpoints
         .Produces<List<ClaimDto>>(StatusCodes.Status200OK)
         .RequireAnyRole();
 
+        // ── GET /metadata/conflicts ─────────────────────────────────────────
+        group.MapGet("/conflicts", async (
+            ICanonicalValueRepository canonicalRepo,
+            CancellationToken ct) =>
+        {
+            var conflicted = await canonicalRepo.GetConflictedAsync(ct);
+            var dtos = conflicted.Select(ConflictDto.FromDomain).ToList();
+            return Results.Ok(dtos);
+        })
+        .WithName("GetConflicts")
+        .WithSummary("Returns all canonical values with unresolved metadata conflicts.")
+        .Produces<List<ConflictDto>>(StatusCodes.Status200OK)
+        .RequireAdminOrCurator();
+
         // ── PATCH /metadata/lock-claim ───────────────────────────────────────
         group.MapMethods("/lock-claim", ["PATCH"], async (
             LockClaimRequest request,
@@ -66,14 +80,16 @@ public static class MetadataEndpoints
             await claimRepo.InsertBatchAsync([claim], ct);
 
             // 2. Upsert the canonical value so the Dashboard sees the change immediately.
+            //    User-locked claims resolve any conflict, so is_conflicted is set to 0.
             var conn = db.Open();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = """
-                INSERT INTO canonical_values (entity_id, key, value, last_scored_at)
-                VALUES (@entity_id, @key, @value, @last_scored_at)
+                INSERT INTO canonical_values (entity_id, key, value, last_scored_at, is_conflicted)
+                VALUES (@entity_id, @key, @value, @last_scored_at, 0)
                 ON CONFLICT(entity_id, key) DO UPDATE SET
                     value          = excluded.value,
-                    last_scored_at = excluded.last_scored_at;
+                    last_scored_at = excluded.last_scored_at,
+                    is_conflicted  = 0;
                 """;
             cmd.Parameters.AddWithValue("@entity_id",      request.EntityId.ToString());
             cmd.Parameters.AddWithValue("@key",            request.ClaimKey);
@@ -126,11 +142,12 @@ public static class MetadataEndpoints
             var conn = db.Open();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = """
-                INSERT INTO canonical_values (entity_id, key, value, last_scored_at)
-                VALUES (@entity_id, @key, @value, @last_scored_at)
+                INSERT INTO canonical_values (entity_id, key, value, last_scored_at, is_conflicted)
+                VALUES (@entity_id, @key, @value, @last_scored_at, 0)
                 ON CONFLICT(entity_id, key) DO UPDATE SET
                     value          = excluded.value,
-                    last_scored_at = excluded.last_scored_at;
+                    last_scored_at = excluded.last_scored_at,
+                    is_conflicted  = 0;
                 """;
             cmd.Parameters.AddWithValue("@entity_id",      request.EntityId.ToString());
             cmd.Parameters.AddWithValue("@key",            request.ClaimKey);

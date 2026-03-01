@@ -42,6 +42,16 @@ public interface IMediaAssetRepository
     Task<bool> InsertAsync(MediaAsset asset, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the asset whose <c>file_path_root</c> matches <paramref name="pathRoot"/>,
+    /// or <see langword="null"/> if no such asset exists.
+    ///
+    /// Used by the deletion handler to locate the asset record when the file
+    /// has already been removed from disk (content hash is unavailable).
+    /// Spec: Phase B – Deleted File Cleanup (B-04).
+    /// </summary>
+    Task<MediaAsset?> FindByPathRootAsync(string pathRoot, CancellationToken ct = default);
+
+    /// <summary>
     /// Updates the <c>status</c> column for the asset identified by <paramref name="id"/>.
     /// Used to transition assets through the
     /// Normal → Conflicted / Normal → Orphaned lifecycle states.

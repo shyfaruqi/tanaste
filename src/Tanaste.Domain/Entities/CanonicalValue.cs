@@ -30,4 +30,13 @@ public sealed class CanonicalValue
     /// Used to detect staleness when provider weights are updated.
     /// </summary>
     public DateTimeOffset LastScoredAt { get; set; }
+
+    /// <summary>
+    /// <see langword="true"/> when the scoring engine could not pick a clear winner
+    /// for this field — the runner-up value's weight was within epsilon of the
+    /// winner's weight.  Surfaced in the Dashboard so a Curator can resolve it
+    /// manually via the lock-claim endpoint.
+    /// Spec: Phase B – Conflict Surfacing (B-05).
+    /// </summary>
+    public bool IsConflicted { get; set; }
 }

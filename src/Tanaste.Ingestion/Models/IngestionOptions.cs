@@ -25,12 +25,12 @@ public sealed class IngestionOptions
 
     /// <summary>
     /// Tokenized path template applied by <see cref="Contracts.IFileOrganizer"/>.
-    /// Example: <c>"{MediaType}/{Author}/{Title}"</c>.
-    /// Default: <c>"{Category}/{HubName} ({Year})/{Format} - {Edition}"</c> (Phase 7 Hub-first template).
-    /// The engine appends <c>/{FileName}.{ext}</c> automatically after resolving this template.
+    /// Supports conditional groups: <c>({Token})</c> — when the token value is empty,
+    /// the entire group (parentheses + leading space) is collapsed.
+    /// Example: <c>"{Category}/{HubName} ({Year})/{Format}/{HubName} ({Edition}){Ext}"</c>.
     /// </summary>
     public string OrganizationTemplate { get; set; } =
-        "{Category}/{HubName} ({Year})/{Format} - {Edition}";
+        "{Category}/{HubName} ({Year})/{Format}/{HubName} ({Edition}){Ext}";
 
     /// <summary>
     /// When <see langword="true"/> the engine automatically moves accepted files

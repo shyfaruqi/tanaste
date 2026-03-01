@@ -112,10 +112,14 @@ CREATE TABLE IF NOT EXISTS metadata_claims (
 -- Every row here MUST be derivable from â‰¥1 rows in metadata_claims
 -- (spec: Canonical Integrity invariant).
 CREATE TABLE IF NOT EXISTS canonical_values (
-    entity_id      TEXT NOT NULL,
-    key            TEXT NOT NULL,
-    value          TEXT NOT NULL,
-    last_scored_at TEXT NOT NULL,
+    entity_id      TEXT    NOT NULL,
+    key            TEXT    NOT NULL,
+    value          TEXT    NOT NULL,
+    last_scored_at TEXT    NOT NULL,
+    -- Phase B: tracks whether the scoring engine could not pick a clear winner.
+    -- 1 = conflicted (runner-up within epsilon of winner); 0 = resolved.
+    is_conflicted  INTEGER NOT NULL DEFAULT 0
+                       CHECK (is_conflicted IN (0, 1)),
     PRIMARY KEY (entity_id, key)
 );
 

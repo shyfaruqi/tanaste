@@ -1,6 +1,7 @@
 @namespace Tanaste.Web.Shared
 @inherits LayoutComponentBase
 @inject ThemeService ThemeService
+@inject UIOrchestratorService Orchestrator
 @inject NavigationManager Nav
 @implements IDisposable
 
@@ -13,16 +14,30 @@
 <CommandPalette @ref="_palette" />
 
 <MudLayout>
-    @* ── Header: avatar | centered title | search + theme toggle ── *@
+    @* ── Header: avatar menu | centered title | search + theme toggle ── *@
     <MudAppBar Elevation="0" Class="spatial-appbar">
-        <MudIconButton OnClick="@(() => Nav.NavigateTo("/settings"))"
-                       title="Profile & Settings"
-                       Class="mr-1"
-                       Style="padding: 4px;">
-            <MudAvatar Size="Size.Small" Style="background: var(--tanaste-glass-inner-bg);">
-                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
-            </MudAvatar>
-        </MudIconButton>
+        <MudMenu AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+            <ActivatorContent>
+                <MudAvatar Size="Size.Small"
+                           Style="@($"background: {_avatarColor}; cursor: pointer;")"
+                           title="Profile & Settings">
+                    @_avatarInitial
+                </MudAvatar>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem Icon="@Icons.Material.Outlined.Tune"
+                             OnClick="@(() => Nav.NavigateTo("/preferences"))">
+                    Preferences
+                </MudMenuItem>
+                @if (_isAdminOrCurator)
+                {
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Settings"
+                                 OnClick="@(() => Nav.NavigateTo("/server-settings"))">
+                        Server Settings
+                    </MudMenuItem>
+                }
+            </ChildContent>
+        </MudMenu>
 
         <MudSpacer />
 
@@ -64,6 +79,11 @@
 
     private CommandPalette? _palette;
 
+    // Profile state for the avatar dropdown.
+    private string _avatarColor       = "#7C4DFF";
+    private string _avatarInitial     = "?";
+    private bool   _isAdminOrCurator  = true; // Safe default — show all options until profile loads.
+
     protected override void OnInitialized()
     {
         _isDark = ThemeService.IsDarkMode;
@@ -78,6 +98,9 @@
             await JS.InvokeVoidAsync("registerCtrlK", DotNetObjectReference.Create(this));
             // Seed the body class so logos render correctly before any toggle.
             await JS.InvokeVoidAsync("setThemeClass", _isDark);
+
+            // Load the active profile for the avatar dropdown.
+            await LoadActiveProfileAsync();
         }
     }
 
@@ -95,6 +118,29 @@
     {
         _isDark = ThemeService.IsDarkMode;
         InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadActiveProfileAsync()
+    {
+        try
+        {
+            var profile = await Orchestrator.GetActiveProfileAsync();
+            if (profile is not null)
+            {
+                _avatarColor = profile.AvatarColor;
+                _avatarInitial = profile.DisplayName.Length > 0
+                    ? profile.DisplayName[0].ToString().ToUpper()
+                    : "?";
+                _isAdminOrCurator =
+                    string.Equals(profile.Role, "Administrator", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(profile.Role, "Curator", StringComparison.OrdinalIgnoreCase);
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            // Engine may be offline — keep defaults.
+        }
     }
 
     public void Dispose() => ThemeService.OnThemeChanged -= OnThemeUpdated;

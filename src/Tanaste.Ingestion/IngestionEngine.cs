@@ -317,6 +317,8 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
         await _claimRepo.InsertBatchAsync(claims, ct).ConfigureAwait(false);
 
         // Phase 9: persist canonical values (current winning metadata for this asset).
+        // Phase B: also persist the IsConflicted flag from the scoring engine so
+        // the Dashboard can surface unresolved metadata disagreements.
         var canonicals = scored.FieldScores
             .Where(f => !string.IsNullOrEmpty(f.WinningValue))
             .Select(f => new CanonicalValue
@@ -325,6 +327,7 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
                 Key          = f.Key,
                 Value        = f.WinningValue!,
                 LastScoredAt = scored.ScoredAt,
+                IsConflicted = f.IsConflicted,
             })
             .ToList();
         await _canonicalRepo.UpsertBatchAsync(canonicals, ct).ConfigureAwait(false);
@@ -467,10 +470,34 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
 
     private async Task HandleDeletedAsync(IngestionCandidate candidate, CancellationToken ct)
     {
-        // We don't have the hash for a deleted file, so we can only log.
-        // The reconciler / startup scan will mark orphaned assets.
         _logger.LogInformation("File deleted: {Path}", candidate.Path);
-        await Task.CompletedTask.ConfigureAwait(false);
+
+        // Look up the asset by its stored file path.
+        // The file is gone so we can't hash it, but file_path_root is still in the DB.
+        var asset = await _assetRepo.FindByPathRootAsync(candidate.Path, ct)
+                                    .ConfigureAwait(false);
+
+        if (asset is null)
+        {
+            _logger.LogDebug(
+                "No asset record found for deleted path {Path} — nothing to orphan.",
+                candidate.Path);
+            return;
+        }
+
+        await _assetRepo.UpdateStatusAsync(asset.Id, Domain.Enums.AssetStatus.Orphaned, ct)
+                        .ConfigureAwait(false);
+
+        _logger.LogInformation(
+            "Asset {AssetId} marked Orphaned (file no longer exists at {Path}).",
+            asset.Id, candidate.Path);
+
+        await SafePublishAsync("MediaRemoved", new
+        {
+            asset_id  = asset.Id,
+            file_path = candidate.Path,
+            status    = "Orphaned",
+        }, ct).ConfigureAwait(false);
     }
 
     // =========================================================================

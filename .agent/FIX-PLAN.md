@@ -60,6 +60,16 @@ Migration: M-006 adds `role` column to `api_keys` table.
 
 These are features that appear to work but lead to errors or no-ops.
 
+### Phase B — Fix Dead Ends (B-04, B-05, B-06) — COMPLETED (2026-03-01)
+
+Three quick-win items resolved:
+- **B-04** — Deleted files now marked Orphaned via `FindByPathRootAsync` + `HandleDeletedAsync` rewrite.
+- **B-05** — Conflict surfacing end-to-end: `is_conflicted` column (M-007), persistence in IngestionEngine + MetadataHarvestingService, `GET /metadata/conflicts` endpoint, ConflictsTab in Dashboard.
+- **B-06** — Worker Host DI fix: 12+ missing registrations added to `Ingestion/Program.cs` + project reference to `Tanaste.Providers` + `Microsoft.Extensions.Http`.
+
+Files created: `Components/Settings/ConflictsTab.razor`, `Models/ViewDTOs/ConflictViewModel.cs`.
+Files changed: `CanonicalValue.cs`, `IMediaAssetRepository.cs`, `ICanonicalValueRepository.cs`, `schema.sql`, `DatabaseConnection.cs`, `MediaAssetRepository.cs`, `CanonicalValueRepository.cs`, `IngestionEngine.cs`, `MetadataEndpoints.cs`, `Dtos.cs`, `MetadataHarvestingService.cs`, `Tanaste.Ingestion.csproj`, `Ingestion/Program.cs`, `UIOrchestratorService.cs`, `ITanasteApiClient.cs`, `TanasteApiClient.cs`, `SettingsTabBar.razor`, `ServerSettings.razor`.
+
 ### B-01: Hub detail page does not exist
 **What's wrong:** The Command Palette search navigates to `/hub/{hubId}`, but no page exists at that route. Users land on the 404 page.
 **Business goal:** Reliability
@@ -78,19 +88,19 @@ These are features that appear to work but lead to errors or no-ops.
 **Fix:** Wire the callback in `MainLayout.razor` to filter the library view on `Home.razor`. Pass the active intent down to `UniverseStack` and `HubHero`.
 **Effort:** Medium (state passing + filtering logic)
 
-### B-04: Deleted files are not cleaned up
+### B-04: Deleted files are not cleaned up — DONE
 **What's wrong:** When a file is deleted from disk, the system logs it but never marks the asset as Orphaned in the database. No reconciler exists.
 **Business goal:** Reliability
 **Fix:** In `IngestionEngine.HandleDeletedAsync`, call `MediaAssetRepository.UpdateStatusAsync(assetId, AssetStatus.Orphaned)`. Also consider a periodic reconciler that scans for assets whose files no longer exist on disk.
 **Effort:** Small (1 method call in existing handler) + Medium (optional reconciler)
 
-### B-05: Conflict surfacing is missing
+### B-05: Conflict surfacing is missing — DONE
 **What's wrong:** The Intelligence Engine detects when two sources disagree and can't pick a clear winner, but there's no UI to see or resolve these conflicts.
 **Business goal:** Reliability
 **Fix:** Add a "Conflicts" indicator to Hub tiles or a dedicated Conflicts panel in Server Settings. Show the entity, field, competing values, and a resolution button that links to the Curator's Drawer.
 **Effort:** Medium (new UI component + API endpoint for conflicted entities)
 
-### B-06: Standalone Ingestion worker host is broken
+### B-06: Standalone Ingestion worker host is broken — DONE
 **What's wrong:** Missing 6+ dependency registrations from Phase 9. The DI container throws on startup.
 **Business goal:** Reliability, Extensibility
 **Fix:** Add the missing registrations (`IMetadataClaimRepository`, `ICanonicalValueRepository`, `IMetadataHarvestingService`, `IRecursiveIdentityService`, `ISidecarWriter`, `IMediaEntityChainFactory`, `IHubRepository`) to the worker host's `Program.cs`.
@@ -207,10 +217,10 @@ These are features that appear to work but lead to errors or no-ops.
 ## Recommended execution order
 
 ```
-Phase A — Security Foundation (Tier 1)
+Phase A — Security Foundation (Tier 1) ✅ COMPLETE
   G-01 → G-02 → G-03 → G-04 → G-05
 
-Phase B — Fix Dead Ends (Tier 2, quick wins)
+Phase B — Fix Dead Ends (Tier 2, quick wins) ✅ COMPLETE
   B-04 (deleted files)  ← Small
   B-05 (conflict UI)    ← Medium
   B-06 (worker host DI) ← Small

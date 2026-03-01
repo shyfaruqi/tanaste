@@ -533,3 +533,28 @@ public sealed class UpdateOrganizationTemplateRequest
     [JsonPropertyName("template")]
     public string Template { get; init; } = string.Empty;
 }
+
+// ── GET /metadata/conflicts ─────────────────────────────────────────────────
+
+public sealed class ConflictDto
+{
+    [JsonPropertyName("entity_id")]
+    public Guid EntityId { get; init; }
+
+    [JsonPropertyName("key")]
+    public string Key { get; init; } = string.Empty;
+
+    [JsonPropertyName("value")]
+    public string Value { get; init; } = string.Empty;
+
+    [JsonPropertyName("last_scored_at")]
+    public DateTimeOffset LastScoredAt { get; init; }
+
+    public static ConflictDto FromDomain(Domain.Entities.CanonicalValue cv) => new()
+    {
+        EntityId    = cv.EntityId,
+        Key         = cv.Key,
+        Value       = cv.Value,
+        LastScoredAt = cv.LastScoredAt,
+    };
+}

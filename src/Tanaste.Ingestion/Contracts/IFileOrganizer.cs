@@ -23,6 +23,13 @@ public interface IFileOrganizer
     string CalculatePath(IngestionCandidate candidate, string template);
 
     /// <summary>
+    /// Resolves the template against sample tokens and validates the resulting path.
+    /// Returns the resolved sample path string, or <see langword="null"/> if validation fails
+    /// (with <paramref name="error"/> explaining the failure).
+    /// </summary>
+    string? ValidateTemplate(string template, out string? error);
+
+    /// <summary>
     /// Moves (or copies-then-deletes) the file from <paramref name="sourcePath"/>
     /// to <paramref name="destinationPath"/>.
     ///

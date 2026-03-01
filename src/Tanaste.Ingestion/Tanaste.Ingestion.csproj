@@ -14,10 +14,17 @@
     <ProjectReference Include="..\Tanaste.Domain\Tanaste.Domain.csproj" />
     <ProjectReference Include="..\Tanaste.Intelligence\Tanaste.Intelligence.csproj" />
     <ProjectReference Include="..\Tanaste.Processors\Tanaste.Processors.csproj" />
+    <!--
+      Phase B (B-06): External metadata providers (AppleBooks, Audnexus, Wikidata)
+      and services (MetadataHarvestingService, RecursiveIdentityService) are required
+      by the IngestionEngine constructor.  Previously missing — caused DI crash.
+    -->
+    <ProjectReference Include="..\Tanaste.Providers\Tanaste.Providers.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 

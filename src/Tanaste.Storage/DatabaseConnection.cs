@@ -172,6 +172,17 @@ public sealed class DatabaseConnection : IDatabaseConnection
             ddl:    "ALTER TABLE api_keys ADD COLUMN role TEXT NOT NULL DEFAULT 'Administrator' " +
                     "CHECK (role IN ('Administrator', 'Curator', 'Consumer'));");
 
+        // Migration M-007: Phase B — add is_conflicted column to canonical_values.
+        // Tracks whether the scoring engine could not pick a clear winner for
+        // a given metadata field.  Existing rows default to 0 (not conflicted);
+        // only re-scored entities will have accurate conflict flags.
+        MigrateAddColumnIfMissing(
+            conn,
+            table:  "canonical_values",
+            column: "is_conflicted",
+            ddl:    "ALTER TABLE canonical_values ADD COLUMN is_conflicted INTEGER NOT NULL DEFAULT 0 " +
+                    "CHECK (is_conflicted IN (0, 1));");
+
         // Seed S-001: provider_registry entries for all known providers.
         // metadata_claims.provider_id has a FK to provider_registry(id), so these
         // rows MUST exist before any claim is written.  INSERT OR IGNORE makes this

@@ -56,6 +56,27 @@ public sealed class MediaAssetRepository : IMediaAssetRepository
     }
 
     /// <inheritdoc/>
+    public Task<MediaAsset?> FindByPathRootAsync(string pathRoot, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        ArgumentException.ThrowIfNullOrWhiteSpace(pathRoot);
+
+        var conn = _db.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, edition_id, content_hash, file_path_root, status
+            FROM   media_assets
+            WHERE  file_path_root = @path
+            LIMIT  1;
+            """;
+        cmd.Parameters.AddWithValue("@path", pathRoot);
+
+        using var reader = cmd.ExecuteReader();
+        var result = reader.Read() ? MapRow(reader) : null;
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
     public Task<MediaAsset?> FindByIdAsync(Guid id, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
