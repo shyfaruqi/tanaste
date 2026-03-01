@@ -113,21 +113,41 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.WatchDirectory))
+        // Always wire the event handler so hot-swap from PUT /settings/folders
+        // works even if no directory was configured at startup.
+        _watcher.FileDetected += (_, evt) => _debounce.Enqueue(evt);
+
+        if (!string.IsNullOrWhiteSpace(_options.WatchDirectory))
         {
-            _logger.LogWarning("IngestionEngine: WatchDirectory is not configured. " +
-                               "Set Ingestion:WatchDirectory in appsettings.json.");
-            return;
+            try
+            {
+                _watcher.AddDirectory(_options.WatchDirectory, _options.IncludeSubdirectories);
+                _logger.LogInformation(
+                    "IngestionEngine started. Watching: {Path}", _options.WatchDirectory);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                _logger.LogWarning(
+                    "IngestionEngine: Watch directory does not exist: {Path}. " +
+                    "Create the directory or update the path in Settings.",
+                    _options.WatchDirectory);
+            }
+        }
+        else
+        {
+            _logger.LogInformation(
+                "IngestionEngine: No WatchDirectory configured. " +
+                "Set a Watch Folder in Settings to begin file ingestion.");
         }
 
-        // Wire the watcher → debounce queue.
-        _watcher.FileDetected += (_, evt) => _debounce.Enqueue(evt);
-        _watcher.AddDirectory(_options.WatchDirectory, _options.IncludeSubdirectories);
+        // Mark the watcher as "running" so that a later UpdateDirectory() call
+        // (from PUT /settings/folders) immediately activates the new watcher.
+        // Safe to call with zero directories — Start() is a no-op on an empty list.
         _watcher.Start();
 
-        _logger.LogInformation("IngestionEngine started. Watching: {Path}", _options.WatchDirectory);
-
         // Consume candidates until the service is stopped.
+        // If no watcher is active yet, this loop simply waits — new events will
+        // flow once the user sets a Watch Folder via the Settings page.
         await foreach (var candidate in _debounce.Reader.ReadAllAsync(stoppingToken)
                            .ConfigureAwait(false))
         {

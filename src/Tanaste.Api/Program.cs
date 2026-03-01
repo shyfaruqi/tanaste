@@ -133,11 +133,13 @@ builder.Services.AddSingleton<IFileOrganizer, FileOrganizer>();
 builder.Services.AddSingleton<IMetadataTagger, EpubMetadataTagger>();
 builder.Services.AddSingleton<IBackgroundWorker, BackgroundWorker>();
 
-// IngestionEngine registered as both a plain singleton and IIngestionEngine.
-// AddHostedService is intentionally NOT called — the background watcher loop
-// never starts in the API process. Only DryRunAsync is needed here.
+// IngestionEngine registered as a singleton, IIngestionEngine interface, AND a
+// hosted service.  When WatchDirectory is configured, the background watcher loop
+// starts automatically.  When WatchDirectory is empty at startup, the engine
+// idles until the user sets a Watch Folder via PUT /settings/folders.
 builder.Services.AddSingleton<IngestionEngine>();
 builder.Services.AddSingleton<IIngestionEngine>(sp => sp.GetRequiredService<IngestionEngine>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IngestionEngine>());
 
 // ── External Metadata Providers (Phase 9 — Zero-Key) ─────────────────────────
 // Named HttpClients: lifecycle managed by IHttpClientFactory.
