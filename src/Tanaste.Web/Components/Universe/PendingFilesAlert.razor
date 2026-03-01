@@ -93,20 +93,39 @@
         try
         {
             var ok = await Orchestrator.TriggerRescanAsync();
-            if (ok)
+            if (!ok)
             {
-                Snackbar.Add("Watch Folder rescan triggered. Files will be processed shortly.",
-                             Severity.Success);
-            }
-            else
-            {
-                Snackbar.Add("Could not trigger rescan. Check that the Watch Folder is configured.",
-                             Severity.Warning);
+                Snackbar.Add(
+                    "Could not trigger rescan. Check that the Engine is running and a Watch Folder is configured.",
+                    Severity.Warning);
+                return;
             }
 
-            // Brief delay so the Engine has time to start processing before we refresh.
-            await Task.Delay(1500);
-            await LoadFilesAsync();
+            Snackbar.Add("Rescan triggered — processing files now.", Severity.Success);
+
+            // The debounce settle delay is ~2 s, plus file-lock probe and processing
+            // time.  Poll at increasing intervals so the user sees files disappear
+            // as soon as they are processed.
+            var before = _files.Count;
+            int[] pollDelays = [3000, 4000, 5000]; // cumulative: 3 s, 7 s, 12 s
+
+            foreach (var delay in pollDelays)
+            {
+                await Task.Delay(delay);
+                await LoadFilesAsync();
+                StateHasChanged();
+
+                if (_files.Count == 0)
+                    break; // All files processed — stop polling.
+            }
+
+            if (_files.Count > 0 && _files.Count >= before)
+            {
+                Snackbar.Add(
+                    "Files are still in the Watch Folder — they may need more time to process, " +
+                    "or may require manual review due to low confidence scoring.",
+                    Severity.Info);
+            }
         }
         finally
         {
