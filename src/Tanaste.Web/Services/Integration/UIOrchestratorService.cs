@@ -314,6 +314,17 @@ public sealed class UIOrchestratorService : IAsyncDisposable
             _state.PushMediaAdded(ev);
         });
 
+        // ── "IngestionCompleted" ────────────────────────────────────────────────
+        // A file has been fully ingested (hashed, scored, and optionally moved).
+        // The Engine publishes this event; invalidate the cache so the grid refreshes.
+        _hubConnection.On<IngestionCompletedClientEvent>("IngestionCompleted", ev =>
+        {
+            _logger.LogInformation(
+                "Intercom ← IngestionCompleted: File=\"{File}\" Type={MediaType}",
+                ev.FilePath, ev.MediaType);
+            _state.PushIngestionCompleted(ev);
+        });
+
         // ── "IngestionProgress" ───────────────────────────────────────────────
         // Active ingestion tick — update the progress indicator.
         _hubConnection.On<IngestionProgressEvent>("IngestionProgress", ev =>

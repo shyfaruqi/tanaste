@@ -142,6 +142,21 @@ public sealed class UniverseStateContainer
     }
 
     /// <summary>
+    /// Called when an <c>"IngestionCompleted"</c> event arrives on the Intercom hub.
+    /// Logs the event and invalidates the hub cache so the next navigation
+    /// triggers a fresh load with the newly ingested file included.
+    /// </summary>
+    public void PushIngestionCompleted(IngestionCompletedClientEvent ev)
+    {
+        var fileName = Path.GetFileName(ev.FilePath);
+        PushActivity(new ActivityEntry(
+            DateTimeOffset.UtcNow, ActivityKind.MediaAdded,
+            "library_add",
+            $"Ingested {ev.MediaType.ToLowerInvariant()}: \"{fileName}\""));
+        Invalidate();
+    }
+
+    /// <summary>
     /// Called when a <c>"PersonEnriched"</c> event arrives on the Intercom hub.
     /// Keeps a rolling buffer of the 50 most recent person updates.
     /// </summary>

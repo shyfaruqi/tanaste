@@ -6,7 +6,7 @@
 
    Supports two modes via the Category parameter:
      "Preferences"    → General, Playback
-     "ServerSettings" → Libraries, Metadata, Connectivity, API Keys, Users, Maintenance
+     "ServerSettings" → Library, Metadata, Connectivity, API Keys, Users, Maintenance
 
    Role-based visibility: Admin-only tabs are hidden when CurrentRole
    is not Administrator or Curator. *@
@@ -72,7 +72,7 @@
         new(SettingsTab.Playback,      Icons.Material.Outlined.PlayArrow,     "Playback",      false, "Preferences"),
 
         // Server Settings tabs
-        new(SettingsTab.Libraries,     Icons.Material.Outlined.FolderOpen,    "Libraries",     true,  "ServerSettings"),
+        new(SettingsTab.Library,       Icons.Material.Outlined.FolderOpen,    "Library",       true,  "ServerSettings"),
         new(SettingsTab.Metadata,      Icons.Material.Outlined.Cloud,         "Metadata",      false, "ServerSettings"),
         new(SettingsTab.Connectivity,  Icons.Material.Outlined.Wifi,          "Connectivity",  true,  "ServerSettings"),
         new(SettingsTab.ApiKeys,       Icons.Material.Outlined.VpnKey,        "API Keys",      true,  "ServerSettings"),
@@ -87,7 +87,7 @@
     public enum SettingsTab
     {
         General, Playback,
-        Libraries, Metadata, Connectivity, ApiKeys, Conflicts, Users, Maintenance
+        Library, Metadata, Connectivity, ApiKeys, Conflicts, Users, Maintenance
     }
 }
 

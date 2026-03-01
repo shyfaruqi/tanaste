@@ -24,7 +24,7 @@
 
 @switch (_activeTab)
 {
-    case SettingsTabBar.SettingsTab.Libraries:
+    case SettingsTabBar.SettingsTab.Library:
         <LibrariesTab />
         break;
     case SettingsTabBar.SettingsTab.Metadata:
@@ -55,7 +55,7 @@
                 OnCorrected="@OnDrawerCorrected" />
 
 @code {
-    private SettingsTabBar.SettingsTab _activeTab = SettingsTabBar.SettingsTab.Libraries;
+    private SettingsTabBar.SettingsTab _activeTab = SettingsTabBar.SettingsTab.Library;
 
     // Default to Administrator until profile session management is wired.
     private string _currentRole = "Administrator";

@@ -93,6 +93,24 @@ public sealed record WatchFolderActiveEvent(
     DateTimeOffset ActivatedAt);
 
 /// <summary>
+/// Payload broadcast by the Tanaste API via SignalR when a file has been
+/// successfully ingested (hashed, scored, and — if AutoOrganize is on — moved
+/// into the library).
+///
+/// SignalR method name: <c>"IngestionCompleted"</c>
+///
+/// The Dashboard invalidates its cached universe state on receipt so the
+/// hub grid refreshes with the newly ingested file.
+/// </summary>
+/// <param name="FilePath">The path of the ingested file (may be the organised destination).</param>
+/// <param name="MediaType">Domain media-type string (e.g. "Epub", "Movie").</param>
+/// <param name="CompletedAt">UTC timestamp of when ingestion completed.</param>
+public sealed record IngestionCompletedClientEvent(
+    string         FilePath,
+    string         MediaType,
+    DateTimeOffset CompletedAt);
+
+/// <summary>
 /// Payload broadcast periodically by the Engine's <c>FolderHealthService</c> when
 /// the accessibility of the Watch Folder or Library Root changes.
 ///
