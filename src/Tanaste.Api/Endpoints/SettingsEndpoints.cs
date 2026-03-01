@@ -66,6 +66,7 @@ public static class SettingsEndpoints
             UpdateFoldersRequest request,
             IStorageManifest     storageManifest,
             IFileWatcher         fileWatcher,
+            IIngestionEngine     ingestionEngine,
             IEventPublisher      publisher,
             CancellationToken    ct) =>
         {
@@ -87,6 +88,12 @@ public static class SettingsEndpoints
             {
                 try { fileWatcher.UpdateDirectory(request.WatchDirectory); }
                 catch (Exception) { /* non-fatal: watcher swap failed; path is persisted to manifest. */ }
+
+                // Scan existing files in the new watch directory so files that were
+                // already present before the hot-swap are picked up.  Duplicates are
+                // harmless — the pipeline's hash check short-circuits them.
+                try { ingestionEngine.ScanDirectory(request.WatchDirectory); }
+                catch (Exception) { /* non-fatal */ }
             }
 
             // Broadcast the new active watch path to all connected Dashboard circuits.

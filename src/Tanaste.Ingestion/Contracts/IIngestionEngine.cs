@@ -25,6 +25,14 @@ public interface IIngestionEngine
     /// </summary>
     Task<IReadOnlyList<PendingOperation>> DryRunAsync(
         string rootPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// Scans a directory for existing files and feeds synthetic "Created" events
+    /// into the debounce queue so they are processed through the normal pipeline.
+    /// Called after a watch-folder hot-swap to pick up files that were already present.
+    /// Duplicates are harmless — the hash-based duplicate check short-circuits them.
+    /// </summary>
+    void ScanDirectory(string directory, bool includeSubdirectories = true);
 }
 
 /// <summary>

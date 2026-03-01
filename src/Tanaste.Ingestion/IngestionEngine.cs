@@ -145,6 +145,17 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
         // Safe to call with zero directories — Start() is a no-op on an empty list.
         _watcher.Start();
 
+        // Initial scan: FileSystemWatcher only detects NEW filesystem events — files
+        // that are already present in the Watch Folder at startup are invisible to it.
+        // Synthesise "Created" events for every existing file so the pipeline processes
+        // them through the normal debounce → hash → duplicate-check → process flow.
+        // Duplicates are harmless — step 5 (hash check) short-circuits them.
+        if (!string.IsNullOrWhiteSpace(_options.WatchDirectory)
+            && Directory.Exists(_options.WatchDirectory))
+        {
+            ScanExistingFiles(_options.WatchDirectory, _options.IncludeSubdirectories);
+        }
+
         // Consume candidates until the service is stopped.
         // If no watcher is active yet, this loop simply waits — new events will
         // flow once the user sets a Watch Folder via the Settings page.
@@ -183,6 +194,10 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
     /// <inheritdoc/>
     async Task IIngestionEngine.StopAsync(CancellationToken ct)
         => await StopAsync(ct).ConfigureAwait(false);
+
+    /// <inheritdoc/>
+    void IIngestionEngine.ScanDirectory(string directory, bool includeSubdirectories)
+        => ScanExistingFiles(directory, includeSubdirectories);
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<PendingOperation>> DryRunAsync(
@@ -548,6 +563,52 @@ public sealed class IngestionEngine : BackgroundService, IIngestionEngine
         }
 
         return ops;
+    }
+
+    // =========================================================================
+    // Initial directory scan
+    // =========================================================================
+
+    /// <summary>
+    /// Enumerates every file already present in the Watch Folder and synthesises
+    /// a <see cref="FileEvent.Created"/> for each one, feeding them into the
+    /// <see cref="DebounceQueue"/>.  This ensures files that were dropped into the
+    /// folder before the Engine started are processed through the normal pipeline.
+    ///
+    /// Duplicates are harmless: step 5 (hash-based duplicate check) in
+    /// <see cref="ProcessCandidateAsync"/> short-circuits them instantly.
+    /// </summary>
+    private void ScanExistingFiles(string directory, bool includeSubdirectories)
+    {
+        var searchOption = includeSubdirectories
+            ? SearchOption.AllDirectories
+            : SearchOption.TopDirectoryOnly;
+
+        int count = 0;
+        try
+        {
+            foreach (var filePath in Directory.EnumerateFiles(directory, "*.*", searchOption))
+            {
+                _debounce.Enqueue(new FileEvent
+                {
+                    Path       = filePath,
+                    EventType  = FileEventType.Created,
+                    OccurredAt = DateTimeOffset.UtcNow,
+                });
+                count++;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Initial scan of watch directory failed after {Count} files: {Dir}",
+                count, directory);
+        }
+
+        if (count > 0)
+            _logger.LogInformation(
+                "Initial scan: enqueued {Count} existing file(s) from {Dir}",
+                count, directory);
     }
 
     // =========================================================================
