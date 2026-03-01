@@ -79,6 +79,76 @@ public static class IngestionEndpoints
         .Produces(StatusCodes.Status400BadRequest)
         .RequireAdmin();
 
+        // ── GET /ingestion/watch-folder ─────────────────────────────────────────
+
+        group.MapGet("/watch-folder", (
+            IOptions<IngestionOptions> opts) =>
+        {
+            var watchDir = opts.Value.WatchDirectory;
+
+            if (string.IsNullOrWhiteSpace(watchDir))
+                return Results.Ok(new WatchFolderResponse { Files = [] });
+
+            if (!Directory.Exists(watchDir))
+                return Results.Ok(new WatchFolderResponse { Files = [] });
+
+            var searchOption = opts.Value.IncludeSubdirectories
+                ? SearchOption.AllDirectories
+                : SearchOption.TopDirectoryOnly;
+
+            var files = Directory.EnumerateFiles(watchDir, "*", searchOption)
+                .Select(fullPath =>
+                {
+                    var info = new FileInfo(fullPath);
+                    return new WatchFolderFileDto
+                    {
+                        FileName      = info.Name,
+                        RelativePath  = Path.GetRelativePath(watchDir, fullPath),
+                        FileSizeBytes = info.Length,
+                        LastModified  = new DateTimeOffset(info.LastWriteTimeUtc, TimeSpan.Zero),
+                    };
+                })
+                .OrderByDescending(f => f.LastModified)
+                .ToList();
+
+            return Results.Ok(new WatchFolderResponse
+            {
+                WatchDirectory = watchDir,
+                Files          = files,
+            });
+        })
+        .WithName("ListWatchFolder")
+        .WithSummary("List files currently sitting in the Watch Folder.")
+        .Produces<WatchFolderResponse>(StatusCodes.Status200OK)
+        .RequireAdminOrCurator();
+
+        // ── POST /ingestion/rescan ──────────────────────────────────────────────
+
+        group.MapPost("/rescan", (
+            IIngestionEngine           engine,
+            IOptions<IngestionOptions> opts) =>
+        {
+            var watchDir = opts.Value.WatchDirectory;
+
+            if (string.IsNullOrWhiteSpace(watchDir))
+                return Results.BadRequest(
+                    "Watch directory is not configured. Set Ingestion:WatchDirectory first.");
+
+            if (!Directory.Exists(watchDir))
+                return Results.BadRequest($"Watch directory does not exist: {watchDir}");
+
+            engine.ScanDirectory(watchDir, opts.Value.IncludeSubdirectories);
+
+            return Results.Accepted(value: new { message = "Rescan triggered. Files will be processed shortly." });
+        })
+        .WithName("TriggerRescan")
+        .WithSummary(
+            "Re-scan the Watch Folder for new or unprocessed files. " +
+            "Files are fed into the ingestion pipeline for processing.")
+        .Produces(StatusCodes.Status202Accepted)
+        .Produces(StatusCodes.Status400BadRequest)
+        .RequireAdminOrCurator();
+
         return app;
     }
 }

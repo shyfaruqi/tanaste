@@ -82,6 +82,14 @@ public interface ITanasteApiClient
     /// <summary>GET /metadata/conflicts — canonical values with unresolved metadata conflicts.</summary>
     Task<List<ConflictViewModel>> GetConflictsAsync(CancellationToken ct = default);
 
+    // ── Watch Folder (/ingestion/watch-folder) ─────────────────────────────────
+
+    /// <summary>GET /ingestion/watch-folder — list files currently in the Watch Folder.</summary>
+    Task<List<WatchFolderFileViewModel>> GetWatchFolderAsync(CancellationToken ct = default);
+
+    /// <summary>POST /ingestion/rescan — trigger re-processing of Watch Folder files.</summary>
+    Task<bool> TriggerRescanAsync(CancellationToken ct = default);
+
     // ── Settings (/settings) ──────────────────────────────────────────────────
 
     /// <summary>GET /settings/folders — current Watch Folder + Library Folder paths.</summary>

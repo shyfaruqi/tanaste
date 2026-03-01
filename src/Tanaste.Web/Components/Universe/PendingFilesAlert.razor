@@ -1,0 +1,142 @@
+@namespace Tanaste.Web.Components.Universe
+@inject UIOrchestratorService Orchestrator
+@inject UniverseStateContainer State
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+@* Pending Files Alert — shown on the Home page when files are sitting in the
+   Watch Folder awaiting processing.  Provides a "Process Now" button to trigger
+   a re-scan of the Watch Folder. *@
+
+@if (_files.Count > 0)
+{
+    <MudPaper Elevation="0" Style="@GlassStyle" Class="@Class">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.FolderOpen"
+                     Color="Color.Warning" Class="mr-2" />
+            <MudText Typo="Typo.body1" Style="flex: 1;">
+                <strong>@_files.Count</strong> @(_files.Count == 1 ? "file" : "files")
+                awaiting processing in the Watch Folder
+            </MudText>
+
+            <MudButton Variant="Variant.Outlined"
+                       Size="Size.Small"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="@_rescanning"
+                       OnClick="@TriggerRescanAsync">
+                @(_rescanning ? "Processing…" : "Process Now")
+            </MudButton>
+
+            <MudIconButton Icon="@(_expanded
+                                    ? Icons.Material.Filled.ExpandLess
+                                    : Icons.Material.Filled.ExpandMore)"
+                           Size="Size.Small"
+                           Color="Color.Default"
+                           title="@(_expanded ? "Collapse file list" : "Show file list")"
+                           OnClick="@(() => _expanded = !_expanded)" />
+        </MudStack>
+
+        @if (_expanded)
+        {
+            <MudSimpleTable Dense="true" Hover="true"
+                            Style="background: transparent; margin-top: 8px;">
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Size</th>
+                        <th>Modified</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in _files)
+                    {
+                        <tr>
+                            <td>
+                                <MudTooltip Text="@f.RelativePath">
+                                    <code style="font-family: monospace; font-size: 0.85rem;">
+                                        @f.FileName
+                                    </code>
+                                </MudTooltip>
+                            </td>
+                            <td>@f.FormattedSize</td>
+                            <td>@f.LastModified.LocalDateTime.ToString("g")</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public string? Class { get; set; }
+
+    private List<Tanaste.Web.Models.ViewDTOs.WatchFolderFileViewModel> _files = [];
+    private bool _expanded;
+    private bool _rescanning;
+
+    protected override async Task OnInitializedAsync()
+    {
+        State.OnStateChanged += OnStateChanged;
+        await LoadFilesAsync();
+    }
+
+    private async Task LoadFilesAsync()
+    {
+        _files = await Orchestrator.GetWatchFolderAsync();
+    }
+
+    private async Task TriggerRescanAsync()
+    {
+        _rescanning = true;
+        try
+        {
+            var ok = await Orchestrator.TriggerRescanAsync();
+            if (ok)
+            {
+                Snackbar.Add("Watch Folder rescan triggered. Files will be processed shortly.",
+                             Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Could not trigger rescan. Check that the Watch Folder is configured.",
+                             Severity.Warning);
+            }
+
+            // Brief delay so the Engine has time to start processing before we refresh.
+            await Task.Delay(1500);
+            await LoadFilesAsync();
+        }
+        finally
+        {
+            _rescanning = false;
+        }
+    }
+
+    /// <summary>
+    /// Refresh when the state container fires (e.g. on MediaAdded SignalR event).
+    /// A file that was successfully processed will no longer appear in the Watch Folder.
+    /// </summary>
+    private void OnStateChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadFilesAsync();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        State.OnStateChanged -= OnStateChanged;
+    }
+
+    private const string GlassStyle =
+        "background: var(--tanaste-glass-bg); " +
+        "border: 1px solid var(--tanaste-glass-border); " +
+        "backdrop-filter: blur(10px); " +
+        "-webkit-backdrop-filter: blur(10px); " +
+        "border-radius: 24px; " +
+        "padding: 20px 24px;";
+}

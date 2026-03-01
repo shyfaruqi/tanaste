@@ -236,6 +236,16 @@ public sealed class UIOrchestratorService : IAsyncDisposable
     /// </summary>
     public event Action<string, bool>? OnFolderHealthChanged;
 
+    // ── Watch Folder ─────────────────────────────────────────────────────────
+
+    /// <summary>Returns files currently sitting in the Watch Folder.</summary>
+    public Task<List<WatchFolderFileViewModel>> GetWatchFolderAsync(CancellationToken ct = default)
+        => _api.GetWatchFolderAsync(ct);
+
+    /// <summary>Triggers a re-scan of the Watch Folder, feeding all files into the pipeline.</summary>
+    public Task<bool> TriggerRescanAsync(CancellationToken ct = default)
+        => _api.TriggerRescanAsync(ct);
+
     // ── Conflicts ────────────────────────────────────────────────────────────
 
     /// <summary>

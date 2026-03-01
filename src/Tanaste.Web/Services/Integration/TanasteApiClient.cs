@@ -90,6 +90,30 @@ public sealed class TanasteApiClient : ITanasteApiClient
         catch { return null; }
     }
 
+    // ── GET /ingestion/watch-folder ────────────────────────────────────────────
+
+    public async Task<List<WatchFolderFileViewModel>> GetWatchFolderAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var raw = await _http.GetFromJsonAsync<WatchFolderResponse>("/ingestion/watch-folder", ct);
+            return raw?.Files ?? [];
+        }
+        catch { return []; }
+    }
+
+    // ── POST /ingestion/rescan ──────────────────────────────────────────────
+
+    public async Task<bool> TriggerRescanAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync("/ingestion/rescan", new { }, ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     // ── PATCH /metadata/resolve ───────────────────────────────────────────────
 
     public async Task<bool> ResolveMetadataAsync(

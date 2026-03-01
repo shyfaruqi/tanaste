@@ -558,3 +558,29 @@ public sealed class ConflictDto
         LastScoredAt = cv.LastScoredAt,
     };
 }
+
+// ── /ingestion/watch-folder ──────────────────────────────────────────────────
+
+public sealed class WatchFolderResponse
+{
+    [JsonPropertyName("watch_directory")]
+    public string? WatchDirectory { get; init; }
+
+    [JsonPropertyName("files")]
+    public List<WatchFolderFileDto> Files { get; init; } = [];
+}
+
+public sealed class WatchFolderFileDto
+{
+    [JsonPropertyName("file_name")]
+    public string FileName { get; init; } = string.Empty;
+
+    [JsonPropertyName("relative_path")]
+    public string RelativePath { get; init; } = string.Empty;
+
+    [JsonPropertyName("file_size_bytes")]
+    public long FileSizeBytes { get; init; }
+
+    [JsonPropertyName("last_modified")]
+    public DateTimeOffset LastModified { get; init; }
+}
