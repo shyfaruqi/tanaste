@@ -18,7 +18,8 @@
     <MudAppBar Elevation="0" Class="spatial-appbar">
         <MudMenu AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
             <ActivatorContent>
-                <MudAvatar Size="Size.Medium"
+                <MudAvatar @onclick="context.ToggleAsync"
+                           Size="Size.Medium"
                            Style="@($"background: {_avatarColor}; cursor: pointer;")"
                            title="Profile & Settings">
                     @_avatarInitial
