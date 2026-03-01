@@ -11,7 +11,8 @@ namespace Tanaste.Api.Endpoints;
 /// API key endpoints:
 ///   GET    /admin/api-keys           — list all keys (id, label, created_at only)
 ///   POST   /admin/api-keys           — generate a new key (plaintext shown ONCE)
-///   DELETE /admin/api-keys/{id}      — revoke a key
+///   DELETE /admin/api-keys/{id}      — revoke a single key
+///   DELETE /admin/api-keys           — revoke ALL keys
 ///
 /// Provider configuration endpoints:
 ///   GET    /admin/provider-configs/{providerId}             — list configs (secrets masked)
@@ -77,6 +78,18 @@ public static class AdminEndpoints
         .WithSummary("Revoke an API key. Existing sessions using this key will immediately receive 401.")
         .Produces(StatusCodes.Status204NoContent)
         .Produces(StatusCodes.Status404NotFound);
+
+        // Revoke ALL keys — no route parameter distinguishes this from single revoke.
+        group.MapDelete("/api-keys", async (
+            IApiKeyRepository repo,
+            CancellationToken ct) =>
+        {
+            var count = await repo.DeleteAllAsync(ct);
+            return Results.Ok(new RevokeAllKeysResponse { RevokedCount = count });
+        })
+        .WithName("RevokeAllApiKeys")
+        .WithSummary("Revoke ALL issued API keys. Returns the count of revoked keys.")
+        .Produces<RevokeAllKeysResponse>(StatusCodes.Status200OK);
 
         // ── Provider Configuration ─────────────────────────────────────────────
 

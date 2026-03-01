@@ -144,11 +144,32 @@ public sealed class DatabaseConnection : IDatabaseConnection
             column: "display_name",
             ddl:    "ALTER TABLE hubs ADD COLUMN display_name TEXT;");
 
+        // Migration M-005: Settings & Management Layer - create profiles table.
+        MigrateCreateTableIfMissing(
+            conn,
+            probeTable:  "profiles",
+            probeColumn: "id",
+            ddl: """
+                CREATE TABLE IF NOT EXISTS profiles (
+                    id           TEXT NOT NULL PRIMARY KEY,
+                    display_name TEXT NOT NULL,
+                    avatar_color TEXT NOT NULL DEFAULT '#7C4DFF',
+                    role         TEXT NOT NULL DEFAULT 'Consumer'
+                                     CHECK (role IN ('Administrator', 'Curator', 'Consumer')),
+                    pin_hash     TEXT,
+                    created_at   TEXT NOT NULL
+                );
+                """);
+
         // Seed S-001: provider_registry entries for all known providers.
         // metadata_claims.provider_id has a FK to provider_registry(id), so these
         // rows MUST exist before any claim is written.  INSERT OR IGNORE makes this
         // idempotent — safe to run on every startup.
         SeedProviderRegistry(conn);
+
+        // Seed S-002: default "Owner" Administrator profile.
+        // First-run experience: single user with full access.
+        SeedDefaultProfile(conn);
     }
 
     /// <summary>
@@ -165,6 +186,7 @@ public sealed class DatabaseConnection : IDatabaseConnection
             ("b1000001-a000-4000-8000-000000000002",   "apple_books_audiobook","1.0"),
             ("b2000002-a000-4000-8000-000000000003",   "audnexus",            "1.0"),
             ("b3000003-w000-4000-8000-000000000004",   "wikidata",            "1.0"),
+            ("d0000000-0000-4000-8000-000000000001",   "user_manual",         "1.0"),
         ];
 
         using var cmd = conn.CreateCommand();
@@ -184,6 +206,25 @@ public sealed class DatabaseConnection : IDatabaseConnection
             pVersion.Value = version;
             cmd.ExecuteNonQuery();
         }
+    }
+
+    /// <summary>
+    /// Seeds the default "Owner" Administrator profile on first run.
+    /// Uses <c>INSERT OR IGNORE</c> so duplicate rows are silently skipped.
+    /// </summary>
+    private static void SeedDefaultProfile(SqliteConnection conn)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT OR IGNORE INTO profiles (id, display_name, avatar_color, role, created_at)
+            VALUES (@id, @name, @color, @role, @created);
+            """;
+        cmd.Parameters.AddWithValue("@id",      "00000000-0000-0000-0000-000000000001");
+        cmd.Parameters.AddWithValue("@name",    "Owner");
+        cmd.Parameters.AddWithValue("@color",   "#7C4DFF");
+        cmd.Parameters.AddWithValue("@role",    "Administrator");
+        cmd.Parameters.AddWithValue("@created", DateTimeOffset.UtcNow.ToString("O"));
+        cmd.ExecuteNonQuery();
     }
 
     // -------------------------------------------------------------------------

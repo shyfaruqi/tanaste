@@ -91,3 +91,24 @@ public sealed record PersonEnrichedEvent(
 public sealed record WatchFolderActiveEvent(
     string         WatchDirectory,
     DateTimeOffset ActivatedAt);
+
+/// <summary>
+/// Payload broadcast periodically by the Engine's <c>FolderHealthService</c> when
+/// the accessibility of the Watch Folder or Library Root changes.
+///
+/// SignalR method name: <c>"FolderHealthChanged"</c>
+///
+/// The Dashboard <c>LibrariesTab</c> subscribes to this event and updates the
+/// green/red status dots next to each folder path in real-time.
+/// </summary>
+/// <param name="Path">Absolute path of the folder being checked.</param>
+/// <param name="IsAccessible">Whether the folder exists and is readable.</param>
+/// <param name="HasRead">True if the process can read from the folder.</param>
+/// <param name="HasWrite">True if the process can write to the folder.</param>
+/// <param name="CheckedAt">UTC timestamp of the last health check.</param>
+public sealed record FolderHealthChangedEvent(
+    string         Path,
+    bool           IsAccessible,
+    bool           HasRead,
+    bool           HasWrite,
+    DateTimeOffset CheckedAt);

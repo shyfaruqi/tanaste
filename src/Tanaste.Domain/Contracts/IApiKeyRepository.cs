@@ -30,4 +30,10 @@ public interface IApiKeyRepository
     /// Returns <see langword="true"/> if a row was removed.
     /// </summary>
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Revokes (deletes) all issued API keys.
+    /// Returns the number of keys that were removed.
+    /// </summary>
+    Task<int> DeleteAllAsync(CancellationToken ct = default);
 }

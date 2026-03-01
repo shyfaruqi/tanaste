@@ -113,6 +113,19 @@ public sealed class ApiKeyRepository : IApiKeyRepository
         return Task.FromResult(rows > 0);
     }
 
+    /// <inheritdoc/>
+    public Task<int> DeleteAllAsync(CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var conn = _db.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM api_keys;";
+        var deleted = cmd.ExecuteNonQuery();
+
+        return Task.FromResult(deleted);
+    }
+
     private static ApiKey MapRow(Microsoft.Data.Sqlite.SqliteDataReader r) => new()
     {
         Id        = Guid.Parse(r.GetString(0)),

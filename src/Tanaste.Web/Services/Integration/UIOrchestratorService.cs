@@ -135,6 +135,53 @@ public sealed class UIOrchestratorService : IAsyncDisposable
     public Task<bool> RevokeApiKeyAsync(Guid id, CancellationToken ct = default)
         => _api.RevokeApiKeyAsync(id, ct);
 
+    /// <summary>Revokes all Guest API Keys in a single batch call. Returns count of revoked keys.</summary>
+    public Task<int> RevokeAllApiKeysAsync(CancellationToken ct = default)
+        => _api.RevokeAllApiKeysAsync(ct);
+
+    // ── Profile Management ──────────────────────────────────────────────────────
+
+    /// <summary>Lists all user profiles.</summary>
+    public Task<List<ProfileViewModel>> GetProfilesAsync(CancellationToken ct = default)
+        => _api.GetProfilesAsync(ct);
+
+    /// <summary>Creates a new user profile. Returns true on success.</summary>
+    public async Task<bool> CreateProfileAsync(
+        string displayName, string avatarColor, string role,
+        CancellationToken ct = default)
+    {
+        var result = await _api.CreateProfileAsync(displayName, avatarColor, role, ct);
+        return result is not null;
+    }
+
+    /// <summary>Updates an existing user profile.</summary>
+    public Task<bool> UpdateProfileAsync(
+        Guid id, string displayName, string avatarColor, string role,
+        CancellationToken ct = default)
+        => _api.UpdateProfileAsync(id, displayName, avatarColor, role, ct);
+
+    /// <summary>Deletes a user profile. Cannot delete the seed Owner profile or the last Administrator.</summary>
+    public Task<bool> DeleteProfileAsync(Guid id, CancellationToken ct = default)
+        => _api.DeleteProfileAsync(id, ct);
+
+    // ── Metadata Claims ─────────────────────────────────────────────────────────
+
+    /// <summary>Returns claim history for a given entity (Work or Edition).</summary>
+    public Task<List<ClaimHistoryDto>> GetClaimHistoryAsync(
+        Guid entityId, CancellationToken ct = default)
+        => _api.GetClaimHistoryAsync(entityId, ct);
+
+    /// <summary>Creates a user-locked claim and invalidates the hub cache.</summary>
+    public async Task<bool> LockClaimAsync(
+        Guid entityId, string key, string value,
+        CancellationToken ct = default)
+    {
+        var ok = await _api.LockClaimAsync(entityId, key, value, ct);
+        if (ok)
+            _state.Invalidate();
+        return ok;
+    }
+
     // ── Settings ──────────────────────────────────────────────────────────────
 
     /// <summary>Returns the current Watch Folder and Library Folder configuration.</summary>
@@ -171,6 +218,13 @@ public sealed class UIOrchestratorService : IAsyncDisposable
         add    => _state.OnStateChanged += value;
         remove => _state.OnStateChanged -= value;
     }
+
+    /// <summary>
+    /// Fires when the Engine reports a folder health change via SignalR.
+    /// Parameters: (folderType: "watch" | "library", isHealthy: bool).
+    /// Components should call <c>InvokeAsync(StateHasChanged)</c> in their handler.
+    /// </summary>
+    public event Action<string, bool>? OnFolderHealthChanged;
 
     // ── SignalR Intercom ───────────────────────────────────────────────────────
 
@@ -261,6 +315,20 @@ public sealed class UIOrchestratorService : IAsyncDisposable
                 "Intercom ← WatchFolderActive: Dir={Dir} At={At}",
                 ev.WatchDirectory, ev.ActivatedAt);
             _state.PushWatchFolderActive(ev);
+        });
+
+        // ── "FolderHealthChanged" ───────────────────────────────────────────
+        // Periodic health check reports whether Watch/Library folders are accessible.
+        // LibrariesTab subscribes to OnFolderHealthChanged to update status dots.
+        _hubConnection.On<FolderHealthChangedEvent>("FolderHealthChanged", ev =>
+        {
+            _logger.LogDebug(
+                "Intercom ← FolderHealthChanged: Path={Path} Accessible={Ok}",
+                ev.Path, ev.IsAccessible);
+
+            // Determine folder type by comparing with current known paths.
+            var healthy = ev.IsAccessible && ev.HasRead && ev.HasWrite;
+            OnFolderHealthChanged?.Invoke(ev.Path, healthy);
         });
 
         // ── Connection lifecycle logging ──────────────────────────────────────

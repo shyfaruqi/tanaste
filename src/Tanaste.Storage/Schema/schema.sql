@@ -162,7 +162,23 @@ CREATE TABLE IF NOT EXISTS api_keys (
 
 
 -- =============================================================================
--- 6. PERSONS & PERSON-ASSET LINKS
+-- 6. PROFILES (Identity & Multi-User)
+-- Spec: Settings & Management Layer — Identity & Multi-User
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS profiles (
+    id           TEXT NOT NULL PRIMARY KEY,  -- UUID
+    display_name TEXT NOT NULL,
+    avatar_color TEXT NOT NULL DEFAULT '#7C4DFF',
+    role         TEXT NOT NULL DEFAULT 'Consumer'
+                     CHECK (role IN ('Administrator', 'Curator', 'Consumer')),
+    pin_hash     TEXT,                       -- SHA-256 of 4-digit PIN; NULL = no PIN set
+    created_at   TEXT NOT NULL
+);
+
+
+-- =============================================================================
+-- 7. PERSONS & PERSON-ASSET LINKS
 -- Spec: Phase 9 - Recursive Person Enrichment
 -- =============================================================================
 

@@ -18,6 +18,8 @@ using Tanaste.Domain.Enums;
 using Tanaste.Providers.Adapters;
 using Tanaste.Providers.Contracts;
 using Tanaste.Providers.Services;
+using Tanaste.Identity;
+using Tanaste.Identity.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
 var config  = builder.Configuration;
@@ -70,6 +72,8 @@ builder.Services.AddSingleton<IHubRepository, HubRepository>();
 builder.Services.AddSingleton<IProviderConfigurationRepository, ProviderConfigurationRepository>();
 builder.Services.AddSingleton<IApiKeyRepository, ApiKeyRepository>();
 builder.Services.AddSingleton<ApiKeyService>();
+builder.Services.AddSingleton<IProfileRepository, ProfileRepository>();
+builder.Services.AddSingleton<IProfileService, ProfileService>();
 
 // ── Processors ────────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<IVideoMetadataExtractor, StubVideoMetadataExtractor>();
@@ -140,6 +144,11 @@ builder.Services.AddSingleton<IBackgroundWorker, BackgroundWorker>();
 builder.Services.AddSingleton<IngestionEngine>();
 builder.Services.AddSingleton<IIngestionEngine>(sp => sp.GetRequiredService<IngestionEngine>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<IngestionEngine>());
+
+// ── Folder Health Monitor (Phase 10 — Settings & Management) ─────────────────
+// Periodic background check on Watch Folder + Library Root accessibility.
+// Broadcasts FolderHealthChanged via SignalR when status changes.
+builder.Services.AddHostedService<FolderHealthService>();
 
 // ── External Metadata Providers (Phase 9 — Zero-Key) ─────────────────────────
 // Named HttpClients: lifecycle managed by IHttpClientFactory.
@@ -222,5 +231,6 @@ app.MapStreamEndpoints();
 app.MapIngestionEndpoints();
 app.MapMetadataEndpoints();
 app.MapSettingsEndpoints();
+app.MapProfileEndpoints();
 
 app.Run();

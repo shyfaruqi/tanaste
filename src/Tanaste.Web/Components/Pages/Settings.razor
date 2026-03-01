@@ -14,38 +14,83 @@
                    OnClick="@(() => Nav.NavigateTo("/"))" />
 </MudStack>
 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
-    Configure where Tanaste looks for files, manage access keys, and monitor source connections.
+    Configure your profile, appearance, library folders, metadata sources, API keys, and more.
 </MudText>
 
-<SettingsTabBar ActiveTab="@_activeTab" OnTabChanged="@OnTabChanged" />
+<SettingsTabBar ActiveTab="@_activeTab"
+               OnTabChanged="@OnTabChanged"
+               CurrentRole="@_currentRole" />
 
 @switch (_activeTab)
 {
-    case SettingsTabBar.SettingsTab.General:
-        <GeneralTab />
+    case SettingsTabBar.SettingsTab.Profile:
+        <ProfileTab />
         break;
-    case SettingsTabBar.SettingsTab.Folders:
-        <FoldersTab />
+    case SettingsTabBar.SettingsTab.Appearance:
+        <AppearanceTab />
         break;
-    case SettingsTabBar.SettingsTab.Providers:
-        <ProvidersTab />
+    case SettingsTabBar.SettingsTab.Playback:
+        <PlaybackTab />
         break;
-    case SettingsTabBar.SettingsTab.Security:
-        <SecurityTab />
+    case SettingsTabBar.SettingsTab.Libraries:
+        <LibrariesTab />
         break;
-    case SettingsTabBar.SettingsTab.Activity:
-        <ActivityTab />
+    case SettingsTabBar.SettingsTab.Metadata:
+        <MetadataTab />
         break;
-    case SettingsTabBar.SettingsTab.Notifications:
-        <NotificationsTab />
+    case SettingsTabBar.SettingsTab.Connectivity:
+        <ConnectivityTab />
+        break;
+    case SettingsTabBar.SettingsTab.ApiKeys:
+        <ApiKeysTab />
+        break;
+    case SettingsTabBar.SettingsTab.Users:
+        <UsersTab />
+        break;
+    case SettingsTabBar.SettingsTab.Maintenance:
+        <MaintenanceTab />
         break;
 }
 
+@* Curator's Drawer — opens from the right side for metadata corrections. *@
+<CuratorsDrawer @bind-Open="_drawerOpen"
+                EntityId="@_drawerEntityId"
+                CurrentTitle="@_drawerTitle"
+                OnCorrected="@OnDrawerCorrected" />
+
 @code {
-    private SettingsTabBar.SettingsTab _activeTab = SettingsTabBar.SettingsTab.General;
+    private SettingsTabBar.SettingsTab _activeTab = SettingsTabBar.SettingsTab.Profile;
+
+    // Default to Administrator until profile session management is wired.
+    private string _currentRole = "Administrator";
+
+    // Curator's Drawer state
+    private bool   _drawerOpen;
+    private Guid   _drawerEntityId;
+    private string _drawerTitle = string.Empty;
 
     private void OnTabChanged(SettingsTabBar.SettingsTab tab)
     {
         _activeTab = tab;
+    }
+
+    /// <summary>
+    /// Opens the Curator's Drawer for a specific entity.
+    /// Called by child components (e.g. hub cards) when the user clicks "Fix Match".
+    /// </summary>
+    public void OpenCuratorsDrawer(Guid entityId, string title)
+    {
+        _drawerEntityId = entityId;
+        _drawerTitle    = title;
+        _drawerOpen     = true;
+        StateHasChanged();
+    }
+
+    private void OnDrawerCorrected()
+    {
+        // Correction applied — drawer will close itself.
+        // Future: trigger a hub cache refresh here.
+        _drawerOpen = false;
+        StateHasChanged();
     }
 }

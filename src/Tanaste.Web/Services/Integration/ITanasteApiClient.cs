@@ -48,6 +48,35 @@ public interface ITanasteApiClient
     /// <summary>DELETE /admin/api-keys/{id} — revoke a key immediately.</summary>
     Task<bool> RevokeApiKeyAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>DELETE /admin/api-keys — revoke all keys in a single batch. Returns count of revoked keys.</summary>
+    Task<int> RevokeAllApiKeysAsync(CancellationToken ct = default);
+
+    // ── Profiles (/profiles) ────────────────────────────────────────────────────
+
+    /// <summary>GET /profiles — list all user profiles.</summary>
+    Task<List<ProfileViewModel>> GetProfilesAsync(CancellationToken ct = default);
+
+    /// <summary>POST /profiles — create a new user profile.</summary>
+    Task<ProfileViewModel?> CreateProfileAsync(
+        string displayName, string avatarColor, string role,
+        CancellationToken ct = default);
+
+    /// <summary>PUT /profiles/{id} — update an existing profile.</summary>
+    Task<bool> UpdateProfileAsync(
+        Guid id, string displayName, string avatarColor, string role,
+        CancellationToken ct = default);
+
+    /// <summary>DELETE /profiles/{id} — delete a profile.</summary>
+    Task<bool> DeleteProfileAsync(Guid id, CancellationToken ct = default);
+
+    // ── Metadata claims (/metadata) ─────────────────────────────────────────────
+
+    /// <summary>GET /metadata/claims/{entityId} — claim history for a work/edition.</summary>
+    Task<List<ClaimHistoryDto>> GetClaimHistoryAsync(Guid entityId, CancellationToken ct = default);
+
+    /// <summary>PATCH /metadata/lock-claim — create a user-locked claim.</summary>
+    Task<bool> LockClaimAsync(Guid entityId, string key, string value, CancellationToken ct = default);
+
     // ── Settings (/settings) ──────────────────────────────────────────────────
 
     /// <summary>GET /settings/folders — current Watch Folder + Library Folder paths.</summary>

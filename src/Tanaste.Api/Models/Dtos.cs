@@ -374,3 +374,130 @@ public sealed class ProviderStatusResponse
     [JsonPropertyName("field_weights")]
     public Dictionary<string, double> FieldWeights { get; init; } = [];
 }
+
+// ── /profiles ────────────────────────────────────────────────────────────────
+
+public sealed class ProfileResponseDto
+{
+    [JsonPropertyName("id")]
+    public Guid Id { get; init; }
+
+    [JsonPropertyName("display_name")]
+    public string DisplayName { get; init; } = string.Empty;
+
+    [JsonPropertyName("avatar_color")]
+    public string AvatarColor { get; init; } = "#7C4DFF";
+
+    [JsonPropertyName("role")]
+    public string Role { get; init; } = string.Empty;
+
+    [JsonPropertyName("created_at")]
+    public DateTimeOffset CreatedAt { get; init; }
+
+    public static ProfileResponseDto FromDomain(Domain.Aggregates.Profile p) => new()
+    {
+        Id          = p.Id,
+        DisplayName = p.DisplayName,
+        AvatarColor = p.AvatarColor,
+        Role        = p.Role.ToString(),
+        CreatedAt   = p.CreatedAt,
+    };
+}
+
+public sealed class CreateProfileRequest
+{
+    [JsonPropertyName("display_name")]
+    public string DisplayName { get; init; } = string.Empty;
+
+    [JsonPropertyName("role")]
+    public string Role { get; init; } = "Consumer";
+
+    [JsonPropertyName("avatar_color")]
+    public string AvatarColor { get; init; } = "#7C4DFF";
+}
+
+public sealed class UpdateProfileRequest
+{
+    [JsonPropertyName("display_name")]
+    public string DisplayName { get; init; } = string.Empty;
+
+    [JsonPropertyName("role")]
+    public string Role { get; init; } = string.Empty;
+
+    [JsonPropertyName("avatar_color")]
+    public string AvatarColor { get; init; } = string.Empty;
+}
+
+// ── GET /metadata/claims/{entityId} ──────────────────────────────────────────
+
+public sealed class ClaimDto
+{
+    [JsonPropertyName("id")]
+    public Guid Id { get; init; }
+
+    [JsonPropertyName("claim_key")]
+    public string ClaimKey { get; init; } = string.Empty;
+
+    [JsonPropertyName("claim_value")]
+    public string ClaimValue { get; init; } = string.Empty;
+
+    [JsonPropertyName("provider_id")]
+    public Guid ProviderId { get; init; }
+
+    [JsonPropertyName("confidence")]
+    public double Confidence { get; init; }
+
+    [JsonPropertyName("is_user_locked")]
+    public bool IsUserLocked { get; init; }
+
+    [JsonPropertyName("claimed_at")]
+    public DateTimeOffset ClaimedAt { get; init; }
+
+    public static ClaimDto FromDomain(Domain.Entities.MetadataClaim c) => new()
+    {
+        Id           = c.Id,
+        ClaimKey     = c.ClaimKey,
+        ClaimValue   = c.ClaimValue,
+        ProviderId   = c.ProviderId,
+        Confidence   = c.Confidence,
+        IsUserLocked = c.IsUserLocked,
+        ClaimedAt    = c.ClaimedAt,
+    };
+}
+
+// ── PATCH /metadata/lock-claim ───────────────────────────────────────────────
+
+public sealed class LockClaimRequest
+{
+    [JsonPropertyName("entity_id")]
+    public Guid EntityId { get; init; }
+
+    [JsonPropertyName("claim_key")]
+    public string ClaimKey { get; init; } = string.Empty;
+
+    [JsonPropertyName("chosen_value")]
+    public string ChosenValue { get; init; } = string.Empty;
+}
+
+public sealed class LockClaimResponse
+{
+    [JsonPropertyName("entity_id")]
+    public Guid EntityId { get; init; }
+
+    [JsonPropertyName("claim_key")]
+    public string ClaimKey { get; init; } = string.Empty;
+
+    [JsonPropertyName("chosen_value")]
+    public string ChosenValue { get; init; } = string.Empty;
+
+    [JsonPropertyName("locked_at")]
+    public DateTimeOffset LockedAt { get; init; }
+}
+
+// ── DELETE /admin/api-keys (revoke all) ──────────────────────────────────────
+
+public sealed class RevokeAllKeysResponse
+{
+    [JsonPropertyName("revoked_count")]
+    public int RevokedCount { get; init; }
+}

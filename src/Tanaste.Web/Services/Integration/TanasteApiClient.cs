@@ -180,6 +180,99 @@ public sealed class TanasteApiClient : ITanasteApiClient
         catch { return false; }
     }
 
+    // ── DELETE /admin/api-keys (batch revoke-all) ─────────────────────────────
+
+    public async Task<int> RevokeAllApiKeysAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.DeleteAsync("/admin/api-keys", ct);
+            if (!resp.IsSuccessStatusCode) return 0;
+            var raw = await resp.Content.ReadFromJsonAsync<RevokeAllRaw>(ct);
+            return raw?.RevokedCount ?? 0;
+        }
+        catch { return 0; }
+    }
+
+    // ── /profiles ───────────────────────────────────────────────────────────────
+
+    public async Task<List<ProfileViewModel>> GetProfilesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var raw = await _http.GetFromJsonAsync<List<ProfileViewModel>>("/profiles", ct);
+            return raw ?? [];
+        }
+        catch { return []; }
+    }
+
+    public async Task<ProfileViewModel?> CreateProfileAsync(
+        string displayName, string avatarColor, string role,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var body = new { display_name = displayName, avatar_color = avatarColor, role };
+            var resp = await _http.PostAsJsonAsync("/profiles", body, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            return await resp.Content.ReadFromJsonAsync<ProfileViewModel>(ct);
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> UpdateProfileAsync(
+        Guid id, string displayName, string avatarColor, string role,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var body = new { display_name = displayName, avatar_color = avatarColor, role };
+            var resp = await _http.PutAsJsonAsync($"/profiles/{id}", body, ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> DeleteProfileAsync(Guid id, CancellationToken ct = default)
+    {
+        try
+        {
+            var resp = await _http.DeleteAsync($"/profiles/{id}", ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    // ── /metadata/claims + lock-claim ───────────────────────────────────────────
+
+    public async Task<List<ClaimHistoryDto>> GetClaimHistoryAsync(
+        Guid entityId, CancellationToken ct = default)
+    {
+        try
+        {
+            var raw = await _http.GetFromJsonAsync<List<ClaimHistoryDto>>(
+                $"/metadata/claims/{entityId}", ct);
+            return raw ?? [];
+        }
+        catch { return []; }
+    }
+
+    public async Task<bool> LockClaimAsync(
+        Guid entityId, string key, string value, CancellationToken ct = default)
+    {
+        try
+        {
+            var body = new { entity_id = entityId, claim_key = key, chosen_value = value };
+            using var req = new HttpRequestMessage(new HttpMethod("PATCH"), "/metadata/lock-claim")
+            {
+                Content = JsonContent.Create(body),
+            };
+            var resp = await _http.SendAsync(req, ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     // ── /settings ─────────────────────────────────────────────────────────────
 
     public async Task<FolderSettingsDto?> GetFolderSettingsAsync(CancellationToken ct = default)
@@ -377,4 +470,7 @@ public sealed class TanasteApiClient : ITanasteApiClient
         [property: JsonPropertyName("label")]      string         Label,
         [property: JsonPropertyName("key")]        string         Key,
         [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
+
+    private sealed record RevokeAllRaw(
+        [property: JsonPropertyName("revoked_count")] int RevokedCount);
 }

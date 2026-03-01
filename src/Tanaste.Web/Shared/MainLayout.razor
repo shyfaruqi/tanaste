@@ -1,6 +1,7 @@
 @namespace Tanaste.Web.Shared
 @inherits LayoutComponentBase
 @inject ThemeService ThemeService
+@inject NavigationManager Nav
 @implements IDisposable
 
 <MudThemeProvider Theme="@ThemeService.Theme" IsDarkMode="@_isDark" />
@@ -14,9 +15,14 @@
 <MudLayout>
     @* ── Header: avatar | centered title | search + theme toggle ── *@
     <MudAppBar Elevation="0" Class="spatial-appbar">
-        <MudAvatar Size="Size.Small" Class="mr-3" Style="background: var(--tanaste-glass-inner-bg);">
-            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
-        </MudAvatar>
+        <MudIconButton OnClick="@(() => Nav.NavigateTo("/settings"))"
+                       title="Profile & Settings"
+                       Class="mr-1"
+                       Style="padding: 4px;">
+            <MudAvatar Size="Size.Small" Style="background: var(--tanaste-glass-inner-bg);">
+                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+            </MudAvatar>
+        </MudIconButton>
 
         <MudSpacer />
 
